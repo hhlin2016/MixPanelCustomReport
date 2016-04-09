@@ -405,7 +405,7 @@
 				var element;
 				for (var i = 0; i < data.length; i++){
 					element = data[i];
-					outputData[element[1]] = element[2];
+					outputData[element[0]] = element[1];
 				}
 				return outputData
 			}
@@ -418,14 +418,74 @@
 				}, 2000);
 			}
 			setDefaultEvent();
-	
-			// DATATABLES IMPLEMENTATION
-			// create dummy table for destruction (required for dataTablesChart function)
-			var table = $('#instantlyDestroyedTable').DataTable(); 
 			
-			// Function to create dataTable using jQuery plug-in, dataTables
-			// Inputs: dataSet, an object of Device : value pairings
-			function plotData(dataSet){
+			// Setting === 0 means it's already in [Name, value] pairs
+			// Setting === 1 means it's still in 4 cell arrays
+			function reduceLength(data, limit, setting){
+				var newData = [];
+				if (data.length > limit){
+					var sum = 0;
+					if (setting === 0){
+						for (var i = 0; i < limit; i++){
+							var value = parseInt(data[i][1]);
+							newData.push([data[i][0],value]);
+							sum += value;
+						}
+					}
+					else {
+						for (var i = 0; i < limit; i++){
+							var value = parseInt(data[i][2]);
+							newData.push([data[i][1],value]);
+							sum += value;
+						}
+					}
+					newData.push(["Other Devices", totalNumUsers - sum]);
+				}
+				return newData;
+			}
+			
+			function sortByValue(a, b) {
+				if (a === b) {
+					return 0;
+				}
+				else {
+					return (a < b) ? -1 : 1; // largest to smallest
+				}
+			}
+			function plotGraph(dataSet){
+			// Devices have been selected
+				var plotLimit = (propertiesList.limit <= 100) ? propertiesList.limit : 100;
+				var plotData = [];
+				var otherDevicesCategory = 0;
+				if (propertiesList.deviceFilterNumbers){
+					otherDevicesCategory = 1;
+					var sum = 0;
+					for (var i = 0; i < propertiesList.deviceFilterNumbers.length; i++){
+						var index = propertiesList.deviceFilterNumbers[i]-1;
+						plotData.push([dataSet[index][1], dataSet[index][2]]);
+						sum += dataSet[index][2];
+					}
+
+					if (plotData.length > plotLimit){
+						plotData = reduceLength(plotData, plotLimit, 0);
+					}
+					else{
+						plotData.push(["Other Devices", totalNumUsers - sum]);
+					}
+				}
+				else {
+					if (dataSet.length > plotLimit){
+						otherDevicesCategory = 1;
+						plotData = reduceLength(dataSet, plotLimit, 1);
+						console.log("TEST 1c", plotData);
+					}
+					else {
+						for (var i = 0; i < dataSet.length;i++){
+							plotData.push([dataSet[i][1], dataSet[i][2]]);
+						}
+					}
+					
+				}
 				// Graph the data
 				// Delete the old table
 				if (eventGraph.length > 0) {
@@ -434,17 +494,44 @@
 				// Create a new table
 				eventGraph = $('<div id="#graph" />')
 				$(".mixpanel-platform-section").after(eventGraph)
+				
+				var titleString = (plotData.length - otherDevicesCategory).toString() + ' devices shown';
 				// Select display type based on number of datapoints
 				if (dataSet.length <= graphNumberLimit + 1){
-					eventGraph.MPChart({chartType: 'pie'});
+					eventGraph.MPChart({chartType: 'pie',
+						highchartsOptions: {
+							title: {
+								align : 'center',
+								floating : false,
+								text: titleString
+							}
+						}
+					});
 				}
 				else {
-					eventGraph.MPChart({chartType: 'bar'});
+					eventGraph.MPChart({chartType: 'bar',
+						highchartsOptions: {
+							title: {
+								align : 'center',
+								floating : false,
+								text: titleString
+							}
+						}
+					});
 				}
 				// Convert data back to acceptable form for MPChart
-				var graphData = convertArrayToJSON(dataSet); 
-//				eventGraph.MPChart('setData', graphData);
-
+				var graphData = convertArrayToJSON(plotData); 
+				eventGraph.MPChart('setData', graphData);
+			}
+	
+			// DATATABLES IMPLEMENTATION
+			// create dummy table for destruction (required for dataTablesChart function)
+			var table = $('#instantlyDestroyedTable').DataTable(); 
+			
+			// Function to create dataTable using jQuery plug-in, dataTables
+			// Inputs: dataSet, an object of Device : value pairings
+			function plotData(dataSet){
+				plotGraph(dataSet);
 				// Generate dataTable Variables
 				var titleArray = [{title : "Rank"},
 					  {title : "Device Name"}, 
@@ -678,20 +765,22 @@ function updateDataTablesSearch(data){
 		for (var i = 0; i < data.length; i++){
 			if (data[i]){
 				// deviceList is assumed to be sorted based on # of users
-				indexValues.push(($.inArray(data[i], deviceList) + 1).toString()); 
+				indexValues.push(($.inArray(data[i], deviceList) + 1)); 
 				
 			}
 			else{
-				indexValues.push(($.inArray('null', deviceList) + 1).toString()); 
+				indexValues.push(($.inArray('null', deviceList) + 1)); 
 			}
 			
 		}
 		// Create search string
 		
-		var itemString = "^\\s*"+indexValues[0]+"\\s*$" ;		
+		var itemString = "^\\s*"+indexValues[0].toString()+"\\s*$" ;		
 		for (var i = 1; i < indexValues.length; i++){
-			itemString += '|' + "^\\s*"+indexValues[i]+"\\s*$"  ;
+			itemString += '|' + "^\\s*"+indexValues[i].toString()+"\\s*$"  ;
 		}
+		indexValues.sort(sortByValue);
+		propertiesList.deviceFilterNumbers = indexValues;
 	
 	// Search the table and draw the output
 	table.column(0).search(itemString, true, false, true).draw();	
@@ -776,6 +865,7 @@ DONE TESTING
 				console.log("Change model", selectedDeviceModels);
 				updateFilterString(chosenNames[2]);
 				updateDataTablesSearch(selectedDeviceModels);
+				plotGraph(lastDataPull);
 				//var selectedDeviceModels = $('.chosen-model').chosen().val()
 				//propertiesList['dropdownDeviceModelString'] = selectedDeviceModels;
 				// Update for selected devices
