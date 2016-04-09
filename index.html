@@ -99,9 +99,6 @@
 			
 			// Store data from last pull (for use with limit changes)
 			var lastDataPull;
-			// Global variables for referencing
-			var deviceList;
-			var totalNumUsers;
 		  
 			// Function to update the selected time from the dropdown menu
 			// Also shows/hides elements relating to the jQuery datePicker
@@ -226,7 +223,6 @@
 				};
 				MP.api.custom_query(stringBuilderChosenOptions(chosenName.chosenTitle, 0), params).done(function(results) {
 					updateChosen(chosenName, results[0]);
-					console.log("getDropdownMenuData", results[0])
 				});		
 			}
 			
@@ -247,7 +243,6 @@
 				if (propertiesList.appNameString){
 					propertyFilters += '.filter(function(event) { return (' + propertiesList.appNameString +' ) })';
 				}
-				
 				if (propertiesList.deviceModelString){
 					propertyFilters += '.filter(function(event) { return (' + propertiesList.deviceModelString +' ) })';
 				}
@@ -269,7 +264,7 @@
 									}\
 								}\
 								for (i=0; i<object.length; i++){\
-									var element = object[i].key["0"];\
+									var element = [object[i].key["0"]];\
 									allData.push(element);\
 								}\
 								return allData;\
@@ -363,8 +358,13 @@
 				}
 				
 				outputString = startFunction + eventFilter + propertyFilters + groupByString + reducer + map + '}';
+				console.log(outputString);
 				return outputString;
 			
+			}
+			
+			function stringBuilderFinalData(){
+
 			}
 
 			function runQuery(){
@@ -385,10 +385,9 @@
 					};
 					
 					MP.api.custom_query(stringBuilderChosenOptions('$model', 1), params).done(function(results) {
-						
-						lastDataPull = results[0];
-						parseBaseData(results[0]);
+						console.log(results);
 						plotData(results[0]);
+						lastDataPull = results[0];
 					});
 
 				}
@@ -440,6 +439,7 @@
 				}
 				// Convert data back to acceptable form for MPChart
 				var graphData = convertArrayToJSON(dataSet); 
+				console.log("PLOTDATA", graphData);
 //				eventGraph.MPChart('setData', graphData);
 
 				// Generate dataTable Variables
@@ -483,16 +483,14 @@
 					};
 
 					// Total number of users over all pages
-					total = totalNumUsers;
-					/*
 					total = api
 						.column( 2 )
 						.data()
 						.reduce( function (a, b) {
 							return intVal(a) + intVal(b);
 						} );
-					*/
-					totalNumDevices = deviceList.length;
+					
+					totalNumDevices = data.length;
 
 					// Total number of users over this page
 					pageTotal = api
@@ -658,61 +656,13 @@
 				}, 333);
 				return true;
 			} /* end download() */
-
-/*
-TESTING
-*/
-
-function updateDataTablesSearch(data){
-	// Since the search function doesn't work for names with spaces, search by index value
-	if (data){
-		// Find index of each device
-		var indexValues = [];
-		for (var i = 0; i < data.length; i++){
-			// deviceList is assumed to be sorted based on # of users
-			indexValues.push(($.inArray(data[i], deviceList) + 1).toString()); 
-		}
-		// Create search string
-		
-		var itemString = "^\\s*"+indexValues[0]+"\\s*$" ;		
-		for (var i = 1; i < indexValues.length; i++){
-			itemString += '|' + "^\\s*"+indexValues[i]+"\\s*$"  ;
-		}
-	
-	// Search the table and draw the output
-	table.column(0).search(itemString, true, false, true).draw();	
-	console.log("updateDataTablesSearch", data, indexValues, deviceList);
-	}
-	// In event search criteria have been cleared, clear the table
-	else{
-	table
-		.search( '' )
-		.columns().search( '' )
-		.draw();
-	}
-}
-
-
-function parseBaseData(data){
-	deviceList = [];
-	totalNumUsers = 0;
-	for (var i = 0; i < data.length;i++){
-		deviceList.push(data[i][1]);
-		totalNumUsers += data[i][2];
-	}
-}
-
-/*
-DONE TESTING
-*/
+		 
 			/*
 			ON CHANGE effects
 			*/
 			dropdownLimit.on('change', function(e, selection) { 
 				//propertiesList['limit'] = selection;
-				
 				customNumberDevicesSelect(selection);
-				filterTable();
 				// update data for model selection first
 				//runQuery(); // runQuery run from customNumberDevicesSelect
 
@@ -751,12 +701,11 @@ DONE TESTING
 				var selectedDeviceModels = $('.chosen-model').chosen().val()
 				console.log("Change model", selectedDeviceModels);
 				updateFilterString(chosenNames[2]);
-				updateDataTablesSearch(selectedDeviceModels);
 				//var selectedDeviceModels = $('.chosen-model').chosen().val()
 				//propertiesList['dropdownDeviceModelString'] = selectedDeviceModels;
 				// Update for selected devices
 				//adjustDataForSelectedDeviceModels();
-				//runQuery();
+				runQuery();
 			});
 			dropdownDates.on('change', function(e, selection){
 				// Possibility that selections may not be valid following period change
@@ -766,8 +715,6 @@ DONE TESTING
 				clearChosen(chosenNames[1]);
 				clearChosen(chosenNames[2]);
 				getDropdownMenuData(chosenNames[0]);
-				getDropdownMenuData(chosenNames[1]);
-				getDropdownMenuData(chosenNames[2]);
 				updateTime(selection);
 				runQuery();
 			});
@@ -789,8 +736,6 @@ DONE TESTING
 						clearChosen(chosenNames[1]);
 						clearChosen(chosenNames[2]);
 						getDropdownMenuData(chosenNames[0]);
-						getDropdownMenuData(chosenNames[1]);
-						getDropdownMenuData(chosenNames[2]);
 						//setChosenAppNames();
 						runQuery();
 					}
@@ -812,8 +757,6 @@ DONE TESTING
 						clearChosen(chosenNames[1]);
 						clearChosen(chosenNames[2]);
 						getDropdownMenuData(chosenNames[0]);
-						getDropdownMenuData(chosenNames[1]);
-						getDropdownMenuData(chosenNames[2]);
 
 						//setChosenAppNames();
 						runQuery();
