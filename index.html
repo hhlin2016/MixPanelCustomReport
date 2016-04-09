@@ -91,21 +91,14 @@
 			var graphNumberLimit = 20; 	// Note: +1 in implementation for Totals column 
 										// from Limit Field
 			var eventGraph = $('#graph');
-
-			// DataTables Data (for use in other functions)
-			var currentDeviceNames = {};
-			var finalizedData;
-
-			// Initial global variables
-			var totalNumberDevices;
-			var totalNumberUsers;
-			
+		
 			// Initialize Chosen Interface
 			$('.chosen-model').chosen().val();
 			$('.chosen-platform').chosen().val();
 			$('.chosen-appName').chosen().val();
-
-
+			
+			// Store data from last pull (for use with limit changes)
+			var lastDataPull;
 		  
 			// Function to update the selected time from the dropdown menu
 			// Also shows/hides elements relating to the jQuery datePicker
@@ -136,7 +129,8 @@
 					// Hide datepicker and set time data
 					propertiesList["limit"] = numDevices;
 					$(".tbxNumSelect").hide();
-					runQuery();
+					plotData(lastDataPull);
+					//runQuery();
 				}
 			}
 		  
@@ -202,31 +196,6 @@
 				$(chosenName.chosenID).val('').trigger("chosen:updated");
 			}
 			
-//TODO: FIX			
-			// Function to send custom_query to get sum of Distinct Users and Device Models
-			function getSumData(){
-			
-				var eventName = eventSelect.MPEventSelect('value');
-				if (eventName){
-					// Get custom query data
-					// Parameters for custom query
-					var params = {
-						from_date: propertiesList.from,
-						to_date: propertiesList.to,
-						event: eventSelect.MPEventSelect('value')
-					};
-					// Get Total Distinct Users Sum
-					MP.api.custom_query(scriptBuilder(2), params).done(function(results) {
-						totalNumberUsers = results[0];
-					});
-					// Get Total Device Models Sum
-					MP.api.custom_query(scriptBuilder(3), params).done(function(results) {
-						totalNumberDevices = results[0];
-					});
-					
-				}
-			}
-			
 			function updateFilterString(chosenName){
 				var itemList = $(chosenName.chosenID).chosen().val();
 				if (itemList){
@@ -244,8 +213,7 @@
 				}
 				
 			}
-			
-			
+					
 			function getDropdownMenuData(chosenName){
 
 				var params = {
@@ -253,14 +221,15 @@
 					to_date: propertiesList.to,
 					event: eventSelect.MPEventSelect('value')
 				};
-				// Get Total Distinct Users Sum
 				MP.api.custom_query(stringBuilderChosenOptions(chosenName.chosenTitle, 0), params).done(function(results) {
-					console.log(results)
 					updateChosen(chosenName, results[0]);
 				});		
 			}
 			
 			// Selector == 0, retrieve menu data
+			// Selector == 1, 
+			// Selector == 2, retrieve table data
+			
 			function stringBuilderChosenOptions(propertySelector, selector){
 				var startFunction = 'function main() { \
 					return Events({from_date: params.from_date,\
@@ -280,34 +249,34 @@
 				var groupByString = '';
 				var reducer = '';
 				var map = '';
-				if (selector == 0){
-					groupByString = '.groupBy(["properties.'+ propertySelector +'"], mixpanel.reducer.count())';
-					
-					reducer = 
-						'.reduce(function(previousData, object){\
-							var allData = [];\
-							var total = 0;\
-							for (var i = 0; i < previousData.length;i++){\
-								var elementPreviousData = previousData[i];\
-								for (var j = 0; j < elementPreviousData.length;j++){\
-									allData.push(elementPreviousData[j]);\
+				switch (selector) {
+					case 0:
+						groupByString = '.groupBy(["properties.'+ propertySelector +'"], mixpanel.reducer.count())';
+						
+						reducer = 
+							'.reduce(function(previousData, object){\
+								var allData = [];\
+								var total = 0;\
+								for (var i = 0; i < previousData.length;i++){\
+									var elementPreviousData = previousData[i];\
+									for (var j = 0; j < elementPreviousData.length;j++){\
+										allData.push(elementPreviousData[j]);\
+									}\
 								}\
-							}\
-							for (i=0; i<object.length; i++){\
-								var element = [object[i].key["0"]];\
-								allData.push(element);\
-							}\
-							return allData;\
-						})'
-					/*
-					reducer = '.reduce(function(previousData, object){var outputData = [];\
-					for (var i = 0; i < object.length; i++){\
-						itemName = object[i].key["0"];\
-					outputData.push(itemName);}return outputData;})'
-					*/
-				}
-				else{
-					if (selector == 1){
+								for (i=0; i<object.length; i++){\
+									var element = [object[i].key["0"]];\
+									allData.push(element);\
+								}\
+								return allData;\
+							})'
+						/*
+						reducer = '.reduce(function(previousData, object){var outputData = [];\
+						for (var i = 0; i < object.length; i++){\
+							itemName = object[i].key["0"];\
+						outputData.push(itemName);}return outputData;})'
+						*/
+						break;
+					case 1:
 						groupByString = '.groupByUser(["properties.$model"],mixpanel.reducer.count())\
 							.groupBy(["key.1"], mixpanel.reducer.count())';
 						
@@ -383,10 +352,9 @@
 							return allKeys;\
 						});'
 						*/
-					}
-					else{
+						break;
+					default:
 						alert("stringBuilderChosenOptions, incorrect selector value");
-					}
 				}
 				
 				outputString = startFunction + eventFilter + propertyFilters + groupByString + reducer + map + '}';
@@ -398,26 +366,7 @@
 			function stringBuilderFinalData(){
 
 			}
-//TODO: FIX			
-			function testData(){
-			
-				var eventName = eventSelect.MPEventSelect('value');
-				if (eventName){
-					// Get custom query data
-					// Parameters for custom query
-					var params = {
-						from_date: propertiesList.from,
-						to_date: propertiesList.to,
-						event: eventSelect.MPEventSelect('value')
-					};
-					// Get Total Distinct Users Sum
-					MP.api.custom_query(scriptBuilder(4), params).done(function(results) {
-						console.log(results);
-					});
-				}
-			}
-			// Function to fetch data from server based on selected options
-//TODO: FIX			
+
 			function runQuery(){
 				var chosenID = ['.chosen-model', '.chosen-appName', '.chosen-platform'];
 				
@@ -425,13 +374,7 @@
 				var initialParams = {from_date : propertiesList["from"], to_date : 
 									propertiesList["to"]};
 									
-				// Clear list of device models
-				//clearChosen('.chosen-model');
 
-				//getSumData();
-				
-				//testData();
-				
 				if (eventName) {
 					// Get custom query data
 					// Parameters for custom query
@@ -442,12 +385,23 @@
 					};
 					
 					MP.api.custom_query(stringBuilderChosenOptions('$model', 1), params).done(function(results) {
-					console.log(results);
-					plotData(results[0]);
+						console.log(results);
+						plotData(results[0]);
+						lastDataPull = results[0];
 					});
 
 				}
 			};
+			
+			function convertArrayToJSON(data){
+				outputData = {};
+				var element;
+				for (var i = 0; i < data.length; i++){
+					element = data[i];
+					outputData[element[1]] = element[2];
+				}
+				return outputData
+			}
 		  
 			// Set default variables, note time delay may need to be increased if it fails 
 			// to load appropriately
@@ -458,71 +412,7 @@
 			}
 			setDefaultEvent();
 			
-			// Function to build the custom_query string. 
-			// Input: selector, an integer value that determines if this is the initial query 
-			// for getting App Names or for the desired data (0 for desired data, 1 for App Names)
-			// Output: completeString, a string with the custom_query function
-			function test(){
-			/*
-				script = 'function main() { return Events({from_date: params.from_date,to_date: params.to_date,event_selectors: [{event: params.event}] \
-				}).filter(function(event) { return (event.name === params.event && (event.properties["$os"] == "iPhone OS") ) }) \
-.groupByUser(["properties.$model", "properties.App Name"],mixpanel.reducer.count()) \
-.groupBy(["key.1"], mixpanel.reducer.count()) \
-.reduce(function(states, object){ \
-function sortByValue(a, b) { \
-if (a[1] === b[1]) { \
-	return 0; \
-} \
-else { \
-	return (a[1] < b[1]) ? 1 : -1; \
-} \
-} \
-var testArray = []; \
-for (var i = 0; i < object.length;i++){ \
-var element = [object[i].key, object[i].value]; \
-testArray.push(element); \
-} \
-var newArray = []; \
-testArray.sort(sortByValue); \
-for (i = 0; i < testArray.length;i++){ \
-var newElement = [i+1, testArray[i][0], testArray[i][1]]; \
-newArray.push(newElement); \
-} \
-return newArray; \
-}) \
-}'*/
-var script = 'function main() {return Events({from_date: params.from_date,to_date: params.to_date,event_selectors: [{event: params.event}]})\
-.filter(function(event) { return (event.name === params.event && (event.properties["$os"] == "iPhone OS") ) })\
-.groupByUser(["properties.$model", "properties.App Name"],mixpanel.reducer.count())\
-.groupBy(["key.1"], mixpanel.reducer.count())\
-.reduce(function(states, object){\
-function sortByValue(a, b) {\
-if (a[1] === b[1]) {\
-return 0;\
-}\
-else {\
-return (a[1] < b[1]) ? 1 : -1; \
-}\
-}\
-var testArray = [];\
-for (var i = 0; i < object.length;i++){\
-var element = [String(object[i].key), object[i].value];\
-testArray.push(element);\
-}\
-var newArray = [];\
-var targetItems = ["iPhone8,1", "iPad6,7"];\
-testArray.sort(sortByValue);\
-for (i = 0; i < testArray.length;i++){\
-var newElement = [i+1, testArray[i][0], testArray[i][1]];\
-if (targetItems.indexOf((newElement[1])) != -1){\
-newArray.push(newElement);\
-}\
-}\
-return newArray;\
-})\
-}'
-			return script;
-			}
+
 
 
 			// DATATABLES IMPLEMENTATION
@@ -548,7 +438,8 @@ return newArray;\
 					eventGraph.MPChart({chartType: 'bar'});
 				}
 				// Convert data back to acceptable form for MPChart
-//				var graphData = spliceDataForGraph(dataSet); 
+				var graphData = convertArrayToJSON(dataSet); 
+				console.log("PLOTDATA", graphData);
 //				eventGraph.MPChart('setData', graphData);
 
 				// Generate dataTable Variables
@@ -575,9 +466,10 @@ return newArray;\
 					{ className: "dt-center", "targets": [ 3 ] }
 				],
 				//"bFilter": false, // hide search box for table
-				'iDisplayLength': -1,
-				"lengthMenu": [ [10, 20, -1], [10, 20, "All"] ], // Number to display
-				
+//				'iDisplayLength': -1,
+				//"lengthMenu": [ [10, 20, -1], [10, 20, "All"] ], // Number to display
+				"iDisplayLength": propertiesList.limit, // Set to dropdown menu value
+				"bLengthChange": false, // Hide dataTable option
 				// Create Footer with sums
 				"footerCallback": function ( row, data, start, end, display ) {
 					var api = this.api(), data;
@@ -591,7 +483,14 @@ return newArray;\
 					};
 
 					// Total number of users over all pages
-					total = totalNumberUsers
+					total = api
+						.column( 2 )
+						.data()
+						.reduce( function (a, b) {
+							return intVal(a) + intVal(b);
+						} );
+					
+					totalNumDevices = data.length;
 
 					// Total number of users over this page
 					pageTotal = api
@@ -622,7 +521,7 @@ return newArray;\
 
 					// Label for device total in footer (static)
 					$( api.column( 0 ).footer() ).html(
-						'Total Number of Devices: ' + totalNumberDevices
+						'Total Number of Devices: ' + totalNumDevices
 					);
 
 
@@ -869,6 +768,7 @@ return newArray;\
 				//var userPass = document.getElementById('tbxNumResultsSelect');
 				var textboxValue = tbxNumResultsSelect.value
 				propertiesList['limit'] = textboxValue;
+				plotData(lastDataPull);
 				//runQuery();
 				//alert(textboxValue);
 				
