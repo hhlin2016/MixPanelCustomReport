@@ -18,11 +18,14 @@
 			<div id="labelSelectEvent" class="mixpanel-platform-label" style="width: 
 				258px; padding: 10 px">Select Event</div>
 			<div id="eventSelect" style="float: left;"></div>
-			<div style="clear: both;"></div>
+			
 			<!-- Select Operating System -->
-			<div id="labelSelectOS" class="mixpanel-platform-label" style="width: 
-				258px; padding: 10 px">Select Operating System</div>
-			<div id="operatingSystemSelect" style="float: left;"></div>
+			<div style="clear: both;"></div>
+			<div id="labelSelectPlatforms" class="mixpanel-platform-label" style=
+				"width: 258px; padding: 10 px">Select Platform(s)</div>
+			<select data-placeholder="Select Platform(s), leave empty for all" class=
+				"chosen-platform" multiple="true" style="width: calc(100% - 300px); float:right" ></select>
+			
 			<!-- Select App Name(s) -->
 			<div style="clear: both;"></div>
 			<div id="labelSelectAppNames" class="mixpanel-platform-label" style=
@@ -71,16 +74,18 @@
 		<script>
 			// Set initial properties required for segmentation
 			var propertiesList = {
-				propertyOperatingSystem : "$os",
-				propertyApplicationNames : "App Name",
-				dropdownOSString : '(event.properties.$os == "iPhone OS" || \
-									event.properties.$os == "Android")',
-				dropdownAppNameString : $('.chosen-appName').chosen().val(),
-				dropdownDeviceModelString : $('.chosen-model').chosen().val(),
+				appNameString : null,
+				platformString : null,
+				deviceModelString: null,
 				from: moment().subtract(1, 'months').format("YYYY-MM-DD"),
 				to: moment().format("YYYY-MM-DD"),
 				limit : 10
 			}
+			var chosenNames = [
+				{ chosenTitle : 'Platform', chosenID : '.chosen-platform', chosenStringName : "PlatformString"},
+				{ chosenTitle : 'App Name', chosenID : '.chosen-appName', chosenStringName : "appNameString"},
+				{ chosenTitle : '$model', chosenID : '.chosen-model', chosenStringName : "deviceModelString"}
+			];
 			// Initial variables
 			var eventSelect = $('#eventSelect').MPEventSelect();
 			var graphNumberLimit = 20; 	// Note: +1 in implementation for Totals column 
@@ -94,6 +99,11 @@
 			// Initial global variables
 			var totalNumberDevices;
 			var totalNumberUsers;
+			
+			// Initialize Chosen Interface
+			$('.chosen-model').chosen().val();
+			$('.chosen-platform').chosen().val();
+			$('.chosen-appName').chosen().val();
 
 
 		  
@@ -127,7 +137,6 @@
 					propertiesList["limit"] = numDevices;
 					$(".tbxNumSelect").hide();
 					runQuery();
-
 				}
 			}
 		  
@@ -156,212 +165,44 @@
 					{label: 'Pick a Date Range', value: -1}
 				]
 			};
-		  
-			// Dropdown Operating Systems Options
-			// TODO: If new OS becomes popular, will need to update this segment,
-			//       consider switching to .chosen system
-			var operatingSystemOptions = {
-				items: [
-					{label: 'Android and iOS', value: '(event.properties.$os == \
-							  "iPhone OS" || event.properties.$os == "Android")'},
-					{label: 'Android', value: 'event.properties.$os == "Android"'},
-					{label: 'iPhone OS', value: 'event.properties.$os == "iPhone OS"'}
-				]
-			};
-			
+
 			// Instantiate dropdown menus
-			var dropdownLimit = $('#numResultsSelect').MPSelect(limitOptions); // limit Options
-			var dropdownOS = $('#operatingSystemSelect').MPSelect(operatingSystemOptions); // OS Options
+			var dropdownLimit = $('#numResultsSelect').MPSelect(limitOptions); // limit Options  
 			var dropdownDates = $('#timeSelect').MPSelect(dateOptions);     // date Options
-
-			// Function to update AppName filter for the custom query
-			// Inputs: selectedApps (list of apps to be used as a filter)
-			function updateAppName(selectedApps) {
-				var selectedAppsString = '';
-				var selectedProperty = 'event.properties["App Name"]';
-				// output should look like: '(event.properties["App Name"] == "APP_NAME1" 
-				// || event.properties["App Name"] == "APP_NAME2")'
-				if (selectedApps !== null) {
-					selectedAppsString = '(' + selectedProperty + ' == "' + selectedApps[0] + '"';
-					for (var i = 1; i < selectedApps.length; i++){
-						selectedAppsString += ' || ' + selectedProperty + ' == "' + selectedApps[i] + '"';
-					}
-					selectedAppsString += ")";
-				}  
-				propertiesList.dropdownAppNameString = selectedAppsString;
-			}
 			
-			// Function to duplicate an array (so it doesn't point back to the orginal)
-			// Input: incomingArray, any type of 2-D array
-			function duplicateArray(incomingArray) {
-				var outgoingArray = [];
-				for (var i = 0; i < incomingArray.length; i++){
-					var element = [];
-					for (var j = 0; j < incomingArray[i].length; j++){
-						element[j] = incomingArray[i][j];
+		
+			function updateChosen(chosenName, data){
+				$(chosenName.chosenID).chosen(); // Initialize chosen plugin searchbox
+				if (data){
+					for (var i = 0; i < data.length; i++){
+						newKey = data[i];
+						$(chosenName.chosenID).append("<option value='"+newKey+"'>"+newKey +"</option>");
+						
 					}
-					outgoingArray.push(element);
+					// Update MUST be outside of loop otherwise will lag system incredibly 
+					// with large input size
+					$(chosenName.chosenID).trigger("chosen:updated");
 				}
-				return outgoingArray;
-			}
-			
-			// Function to split the data between selected devices and unselected 
-			// devices, providing a total of unselected items for comparison
-			function adjustDataForSelectedDeviceModels(){
-			console.log(finalizedData);
-				var dataAdjustedForDeviceModels = duplicateArray(finalizedData);
-				var newData = [];
-				// Check for empty list
-				if  (propertiesList['dropdownDeviceModelString']){
-					var selectedModels = propertiesList['dropdownDeviceModelString'];
-					var totalNotSelected = 0;
-					// -1 as last entry is the Other Devices Column we're adding to here.
-					for (var i = 0; i < dataAdjustedForDeviceModels.length - 1; i++){
-						var key = dataAdjustedForDeviceModels[i][1];
-						// If the key wasn't selected, add to the total of unselected items
-						if (selectedModels.indexOf(key) === -1){
-							totalNotSelected += dataAdjustedForDeviceModels[i][2];
-							console.log("ADJUSTING FOR DEVICE MODEL, Not found", selectedModels, key)
-						}
-						// If the key was selected, put it in the new array
-						else{
-							console.log("ADJUSTING FOR DEVICE MODEL", selectedModels, key)
-							var newEntry = dataAdjustedForDeviceModels[i];
-							newData.push(newEntry);
-						}
-					}
-					console.log("Old value, extra", dataAdjustedForDeviceModels[dataAdjustedForDeviceModels.length-1][2], totalNotSelected)
-					// Calculate percentage data for totalNotSelected entry and add to list
-					totalNotSelected += dataAdjustedForDeviceModels[dataAdjustedForDeviceModels.length-1][2];
-					percentage = totalNotSelected/ totalNumberUsers * 100;
-					percentage = parseFloat(percentage).toFixed(2);
-					dataAdjustedForDeviceModels[dataAdjustedForDeviceModels.length-1][1] = 'Other Devices (' + (totalNumberDevices - selectedModels.length).toString() + ')';
-					dataAdjustedForDeviceModels[dataAdjustedForDeviceModels.length-1][2] = totalNotSelected;
-					dataAdjustedForDeviceModels[dataAdjustedForDeviceModels.length-1][3] = percentage;
-					newData.push(dataAdjustedForDeviceModels[dataAdjustedForDeviceModels.length-1]);
-				}
-				// This shouldn't trigger due to the setup of the program
 				else{
-					newData = dataAdjustedForDeviceModels;
-				}				
+					alert("updateChosen, no data");
+				}
 				
-				dataTablesChartUnique(newData);
 			}
 		  
-			// Function to account for Device Limit.
-			// Input: data in the form of an Object with Device : value pairs
-			function adjustDataForLimit(data){
-				if (propertiesList['limit'] < totalNumberDevices){
-					var sum = 0;
-					var sizeOfArray = data.length;
-					for (i = 0; i < sizeOfArray; i++){
-						var entry = data[i];
-						sum += entry[1];
-					}
-					var newEntry = ["Other Devices (" + (totalNumberDevices - propertiesList['limit']).toString() +')', totalNumberUsers - sum] ;
-					data.push(newEntry);
-				}
-				return data;
-			}
-			
-			// Function to parse data and present it in a form suitable for MPCharts
-			// Inputs: data, an array of [Rank, Device Name, Value, Percentage]
-			// Outputs: newData, an object of Device Name : value pairs
-			function spliceDataForGraph(data){
-				var newData = {};
-				for (i = 0; i < data.length; i++){
-					var element = data[i];
-					newData[element[1]] = element[2];
-				}
-				return newData;
-			}
-			
-			// Function to convert JSON data to an Array Format
-			// Inputs: data, an object with Device Name : value pairs
-			function JSONToArray(data){
-				var newArray = [];
-				$.each(data, function(key, value) {
-					$.each(value, function(key, value){
-						var device = value['key']['0'];
-						
-						var newEntry = [device, value['value']];
-						newArray.push(newEntry);
-					});
-				});
-				return newArray;
-				
-			}
-			
-			// Function to update the Chosen Menus (for app name and device models)
-			// Inputs: chosenID (i.e. '.chosen-appName') and data, an object of
-			//			Device Name : value pairs
-			function updateChosen(chosenID, data){
-				$(chosenID).chosen(); // Initialize chosen plugin searchbox
-				$.each(data, function(key, value) {
-				var text = 'BREAK';
-				var newKey
-				
-					// Due to .reduce(mixpanel.reducer.top()), the format for model data
-					// is different and needs to be accounted for specially
-
-					if (chosenID === '.chosen-model'){
-						$.each(value, function(key, value) {
-
-							newKey = value['key']['0'];
-							
-							$(chosenID).append("<option value='"+newKey+"'>"+newKey +"</option>");
-							$(chosenID).trigger("chosen:updated");
-						});
-						
-					}
-					else{
-					
-						newKey = value['key'][0];
-						
-						$(chosenID).append("<option value='"+newKey+"'>"+newKey +"</option>");
-						$(chosenID).trigger("chosen:updated");
-					}
-					
-						
-				});
-			}
-		  
-			// Function to clear the Chosen Menu Options (essentially reset them)
+			// Function to clear the Chosen Menu Options (essentially reset them),
+			// 		propertiesList relevant String variable has to be cleared for new
+			// 		custom_query call
 			// Inputs: chosenID (i.e. '.chosen-appName')
-			function clearChosen(chosenID){
-				var item = '';
-				if (chosenID == '.chosen-appName'){
-					item = 'dropdownAppNameString';
-				}
-				else{
-					if (chosenID == '.chosen-model'){
-						item = 'dropdownDeviceModelString';
-					}
-				}
-				propertiesList[item] = null;
-				$(chosenID).children().remove();
+			function clearChosen(chosenName){
+				// Clear String property
+				propertiesList[chosenName.chosenStringName] = null;
+				// Clear chosen dropdown selectable values
+				$(chosenName.chosenID).children().remove();
+				// clear chosen dropdown selected values
+				$(chosenName.chosenID).val('').trigger("chosen:updated");
 			}
 			
-			// Function to update the App Name selections in Chosen whenever event or OS
-			// change
-			function setChosenAppNames(){
-				clearChosen('.chosen-appName');
-				var eventName = eventSelect.MPEventSelect('value');
-				if (eventName){
-					// Get custom query data
-					// Parameters for custom query
-					var params = {
-						from_date: propertiesList.from,
-						to_date: propertiesList.to,
-						event: eventSelect.MPEventSelect('value')
-					};
-					
-					MP.api.custom_query(scriptBuilder(1), params).done(function(results) {
-						updateChosen('.chosen-appName', results);
-					});
-				}
-			}
-			
+//TODO: FIX			
 			// Function to send custom_query to get sum of Distinct Users and Device Models
 			function getSumData(){
 			
@@ -386,6 +227,178 @@
 				}
 			}
 			
+			function updateFilterString(chosenName){
+				var itemList = $(chosenName.chosenID).chosen().val();
+				if (itemList){
+					var outputString = '(';
+					var leftSideEquivalencyTest = 'event.properties["' + chosenName.chosenTitle + '"] === "';
+					outputString += leftSideEquivalencyTest + itemList[0] + '"';
+					for (var i = 1; i < itemList.length; i++){
+						outputString += ' || ' + leftSideEquivalencyTest + itemList[i] + '"';
+					}
+					outputString += ')';
+					propertiesList[chosenName.chosenStringName] = outputString;
+				}
+				else {
+					propertiesList[chosenName.chosenStringName] = null;
+				}
+				
+			}
+			
+			
+			function getDropdownMenuData(chosenName){
+
+				var params = {
+					from_date: propertiesList.from,
+					to_date: propertiesList.to,
+					event: eventSelect.MPEventSelect('value')
+				};
+				// Get Total Distinct Users Sum
+				MP.api.custom_query(stringBuilderChosenOptions(chosenName.chosenTitle, 0), params).done(function(results) {
+					console.log(results)
+					updateChosen(chosenName, results[0]);
+				});		
+			}
+			
+			// Selector == 0, retrieve menu data
+			function stringBuilderChosenOptions(propertySelector, selector){
+				var startFunction = 'function main() { \
+					return Events({from_date: params.from_date,\
+						to_date: params.to_date,\
+						event_selectors: [{event: params.event}]})';
+				var eventFilter = '.filter(function(event) { return (event.name === params.event ) })';
+				var propertyFilters = '';
+				if (propertiesList.platformString){
+					propertyFilters += '.filter(function(event) { return (' + propertiesList.platformString +' ) })';
+				}
+				if (propertiesList.appNameString){
+					propertyFilters += '.filter(function(event) { return (' + propertiesList.appNameString +' ) })';
+				}
+				if (propertiesList.deviceModelString){
+					propertyFilters += '.filter(function(event) { return (' + propertiesList.deviceModelString +' ) })';
+				}
+				var groupByString = '';
+				var reducer = '';
+				var map = '';
+				if (selector == 0){
+					groupByString = '.groupBy(["properties.'+ propertySelector +'"], mixpanel.reducer.count())';
+					
+					reducer = 
+						'.reduce(function(previousData, object){\
+							var allData = [];\
+							var total = 0;\
+							for (var i = 0; i < previousData.length;i++){\
+								var elementPreviousData = previousData[i];\
+								for (var j = 0; j < elementPreviousData.length;j++){\
+									allData.push(elementPreviousData[j]);\
+								}\
+							}\
+							for (i=0; i<object.length; i++){\
+								var element = [object[i].key["0"]];\
+								allData.push(element);\
+							}\
+							return allData;\
+						})'
+					/*
+					reducer = '.reduce(function(previousData, object){var outputData = [];\
+					for (var i = 0; i < object.length; i++){\
+						itemName = object[i].key["0"];\
+					outputData.push(itemName);}return outputData;})'
+					*/
+				}
+				else{
+					if (selector == 1){
+						groupByString = '.groupByUser(["properties.$model"],mixpanel.reducer.count())\
+							.groupBy(["key.1"], mixpanel.reducer.count())';
+						
+						reducer =
+							'.reduce(function(previousData, object){\
+								var allData = [];\
+								var total = 0;\
+								for (var i = 0; i < previousData.length;i++){\
+									var elementPreviousData = previousData[i];\
+									for (var j = 0; j < elementPreviousData.length;j++){\
+										allData.push(elementPreviousData[j]);\
+									}\
+								}\
+								for (i=0; i<object.length; i++){\
+									var element = [object[i].key["0"], object[i].value];\
+									allData.push(element);\
+								}\
+								return allData;\
+							})'
+						map = 
+							'.map(function(event){\
+								function sortByValue(a, b) {\
+									if (a[1] === b[1]) {\
+										return 0;\
+									}\
+									else {\
+										return (a[1] < b[1]) ? 1 : -1;\
+									}\
+								}\
+								var allData = [];\
+								var total = 0;\
+								event.sort(sortByValue);\
+								for (var i = 0; i < event.length; i++){\
+									total += event[i][1];\
+								}\
+								for (i = 0; i < event.length; i++){\
+									var element = [i+1, event[i][0], event[i][1], parseFloat(event[i][1] / total * 100).toFixed(2)];\
+									allData.push(element);\
+								}\
+								return allData;\
+							})'
+						
+						/*
+						reducer = '.reduce(function(previousData, object){\
+							function sortByValue(a, b) {\
+							if(a[1] === b[1]) {return 0;}\
+							else {return (a[1] < b[1]) ? 1 : -1; }};\
+							var partialData = [];var allData = [];var total = 0;\
+							for (var i = 0; i < previousData.length;i++){\
+								var elementPreviousData = previousData[i];\
+								for (var j = 0; j < elementPreviousData.length;j++){\
+									allData.push(elementPreviousData[j]);\
+								}\
+							}\
+							for (i=0; i<object.length;i++){\
+								total = total + object[i].value;\
+								var element = [object[i].key["0"], object[i].value];\
+								partialData.push(element);}\
+							partialData.sort(sortByValue);\
+							for (i=0; i<object.length; i++){\
+								var newElement = [i+1, partialData[i][0], partialData[i][1], \
+									parseFloat(partialData[i][1]/total*100).toFixed(2)];\
+								allData.push(newElement);}\
+							return allData;});';
+						*/
+						/*
+						reducer ='.reduce(function(previousData, object){\
+							var allKeys = [];\
+							allKeys.push(object.length);\
+							for (var i = 0; i < previousData.length; i++) {\
+								allKeys.push(previousData[i]);\
+							}\
+							return allKeys;\
+						});'
+						*/
+					}
+					else{
+						alert("stringBuilderChosenOptions, incorrect selector value");
+					}
+				}
+				
+				outputString = startFunction + eventFilter + propertyFilters + groupByString + reducer + map + '}';
+				console.log(outputString);
+				return outputString;
+			
+			}
+			
+			function stringBuilderFinalData(){
+
+			}
+//TODO: FIX			
 			function testData(){
 			
 				var eventName = eventSelect.MPEventSelect('value');
@@ -404,16 +417,20 @@
 				}
 			}
 			// Function to fetch data from server based on selected options
+//TODO: FIX			
 			function runQuery(){
+				var chosenID = ['.chosen-model', '.chosen-appName', '.chosen-platform'];
+				
 				var eventName = eventSelect.MPEventSelect('value');
 				var initialParams = {from_date : propertiesList["from"], to_date : 
 									propertiesList["to"]};
+									
 				// Clear list of device models
-				clearChosen('.chosen-model');
+				//clearChosen('.chosen-model');
 
-				getSumData();
+				//getSumData();
 				
-				testData();
+				//testData();
 				
 				if (eventName) {
 					// Get custom query data
@@ -424,25 +441,11 @@
 						event: eventSelect.MPEventSelect('value')
 					};
 					
-					MP.api.custom_query(scriptBuilder(0), params).done(function(results) {
-						// Update Model List
-						updateChosen('.chosen-model', results);
-						var arrayDataSet = JSONToArray(results);
-						// TODO: consider sorting "Other Devices" and giving it an appropriate rank
-						arrayDataSet.sort(sortByValue);
-						arrayDataSet = adjustDataForLimit(arrayDataSet);
-						finalizedData = finalizeData(arrayDataSet);
-						
-						// Check if last entry is an actual device, not Other Devices
-						if (totalNumberDevices >= propertiesList.limit){
-							finalizedData[finalizedData.length-1][0] = '';
-						}
-						
-						//var newData = adjustDataForLimit(finalizedData);
-						// Plot on Graph and dataTable
-
-						dataTablesChartUnique(finalizedData);
+					MP.api.custom_query(stringBuilderChosenOptions('$model', 1), params).done(function(results) {
+					console.log(results);
+					plotData(results[0]);
 					});
+
 				}
 			};
 		  
@@ -454,106 +457,73 @@
 				}, 2000);
 			}
 			setDefaultEvent();
-		  
-			// Function to sort data by largest to smallest, assumes array has [Device Name, 
-			// Value] sub-arrays
-			function sortByValue(a, b) {
-				if (a[1] === b[1]) {
-					return 0;
-				}
-				else {
-					return (a[1] < b[1]) ? 1 : -1; // largest to smallest
-				}
-			}
-			
-			// Function to add Rank and Percentage variables
-			// Inputs: data, an array of [Device, Value] sub-arrays
-			// Outputs: newData, an array of [Rank, Device, Value, Percentage] subarrays
-			function finalizeData(data){
-				var element;
-				var newData = [];
-				// For non-Device-selected lists
-				for (var i = 0; i < data.length; i++){
-					element = [i+1, data[i][0], data[i][1]];
-					percentage = element[2]/ totalNumberUsers * 100;
-					percentage = parseFloat(percentage).toFixed(2);
-					element.push(percentage);
-					newData.push(element);
-				}
-				return newData;
-			}
 			
 			// Function to build the custom_query string. 
 			// Input: selector, an integer value that determines if this is the initial query 
 			// for getting App Names or for the desired data (0 for desired data, 1 for App Names)
 			// Output: completeString, a string with the custom_query function
-			function scriptBuilder(selector){
+			function test(){
 			/*
-			function main() {
-				return Events({
-					from_date: params.from_date,
-					to_date: params.to_date,
-					event_selectors: [{event: params.event}]
-				})
-				.filter(function(event) { return (event.name === params.event && 
-				(event.properties["$os"] == 'iPhone OS') ) })
-
-				// Produce list of App Names relevant to selected operating system 
-				// (in this case, iPhone OS)
-				//.groupBy(["properties.App Name"], mixpanel.reducer.count()); // Get App Names
-				//.groupBy(["properties.$model"], mixpanel.reducer.count()); // Get Model Names
-				.groupByUser(["properties.$model", "properties.App Name"],mixpanel.reducer.count())
-				.groupBy(["key.1"], mixpanel.reducer.count());  // Key.1 is the key from the 
-															    // groupByUser search, Key.2 is app 
-																//names
-				}
-				var params = {
-				"from_date": "2016-01-01",
-				"to_date": "2016-04-01",
-				"event": "App Started"
-			};
-
-			
-			*/
-				// Base portion of string
-				var script = 'function main() { return Events({ from_date: params.from_date, \
-							to_date: params.to_date, event_selectors: [{event: params.event} \
-							] }).filter(function(event) { return event.name == params.event';
-				// Add in OS Selected options
-				var filterOptions = ' && ' + propertiesList.dropdownOSString;
-				// If App Names were selected, add them to the query
-				if (propertiesList.dropdownAppNameString){
-					filterOptions += ' && ' + propertiesList.dropdownAppNameString;
-				}
-				// Close the query string
-				var groupByUserAspect = '}).groupByUser(["properties.$model", "properties.App Name"], \
-							mixpanel.reducer.count())'
-				var end;
-				
-				if (selector === 0) {
-					end = '.groupBy(["key.1"], mixpanel.reducer \
-							.count()).reduce(mixpanel.reducer.top('+ propertiesList["limit"] +'))}';
-				}
-				// Get the total number of distinct users
-				else if (selector === 2){
-					end = '.reduce(mixpanel.reducer.count())}';
-				}
-				// Get total number of device models
-				else if (selector === 3){
-					end = '.groupBy(["key.1"], mixpanel.reducer.count()).reduce(mixpanel.\
-							reducer.count())}';
-				}
-				// TESTING CRITERIA
-				else if (selector === 4){
-					end = '.groupBy(["key.1"], mixpanel.reducer.count())}'
-				}
-				else {
-					end = '.groupBy(["key.2"], mixpanel.reducer.count())}';
-				}
-				var completeString = script + filterOptions + groupByUserAspect + end;
-
-				return completeString;
+				script = 'function main() { return Events({from_date: params.from_date,to_date: params.to_date,event_selectors: [{event: params.event}] \
+				}).filter(function(event) { return (event.name === params.event && (event.properties["$os"] == "iPhone OS") ) }) \
+.groupByUser(["properties.$model", "properties.App Name"],mixpanel.reducer.count()) \
+.groupBy(["key.1"], mixpanel.reducer.count()) \
+.reduce(function(states, object){ \
+function sortByValue(a, b) { \
+if (a[1] === b[1]) { \
+	return 0; \
+} \
+else { \
+	return (a[1] < b[1]) ? 1 : -1; \
+} \
+} \
+var testArray = []; \
+for (var i = 0; i < object.length;i++){ \
+var element = [object[i].key, object[i].value]; \
+testArray.push(element); \
+} \
+var newArray = []; \
+testArray.sort(sortByValue); \
+for (i = 0; i < testArray.length;i++){ \
+var newElement = [i+1, testArray[i][0], testArray[i][1]]; \
+newArray.push(newElement); \
+} \
+return newArray; \
+}) \
+}'*/
+var script = 'function main() {return Events({from_date: params.from_date,to_date: params.to_date,event_selectors: [{event: params.event}]})\
+.filter(function(event) { return (event.name === params.event && (event.properties["$os"] == "iPhone OS") ) })\
+.groupByUser(["properties.$model", "properties.App Name"],mixpanel.reducer.count())\
+.groupBy(["key.1"], mixpanel.reducer.count())\
+.reduce(function(states, object){\
+function sortByValue(a, b) {\
+if (a[1] === b[1]) {\
+return 0;\
+}\
+else {\
+return (a[1] < b[1]) ? 1 : -1; \
+}\
+}\
+var testArray = [];\
+for (var i = 0; i < object.length;i++){\
+var element = [String(object[i].key), object[i].value];\
+testArray.push(element);\
+}\
+var newArray = [];\
+var targetItems = ["iPhone8,1", "iPad6,7"];\
+testArray.sort(sortByValue);\
+for (i = 0; i < testArray.length;i++){\
+var newElement = [i+1, testArray[i][0], testArray[i][1]];\
+if (targetItems.indexOf((newElement[1])) != -1){\
+newArray.push(newElement);\
+}\
+}\
+return newArray;\
+})\
+}'
+			return script;
 			}
+
 
 			// DATATABLES IMPLEMENTATION
 			// create dummy table for destruction (required for dataTablesChart function)
@@ -561,7 +531,7 @@
 			
 			// Function to create dataTable using jQuery plug-in, dataTables
 			// Inputs: dataSet, an object of Device : value pairings
-			function dataTablesChartUnique(newDataSet){
+			function plotData(dataSet){
 				// Graph the data
 				// Delete the old table
 				if (eventGraph.length > 0) {
@@ -571,15 +541,15 @@
 				eventGraph = $('<div id="#graph" />')
 				$(".mixpanel-platform-section").after(eventGraph)
 				// Select display type based on number of datapoints
-				if (newDataSet.length <= graphNumberLimit + 1){
+				if (dataSet.length <= graphNumberLimit + 1){
 					eventGraph.MPChart({chartType: 'pie'});
 				}
 				else {
 					eventGraph.MPChart({chartType: 'bar'});
 				}
 				// Convert data back to acceptable form for MPChart
-				var graphData = spliceDataForGraph(newDataSet); 
-				eventGraph.MPChart('setData', graphData);
+//				var graphData = spliceDataForGraph(dataSet); 
+//				eventGraph.MPChart('setData', graphData);
 
 				// Generate dataTable Variables
 				var titleArray = [{title : "Rank"},
@@ -596,7 +566,7 @@
 				
 				// Create a new table
 				table = $('#dataTable').DataTable( {
-				data: newDataSet,
+				data: dataSet,
 				columns: titleArray,
 				"columnDefs": [
 					{ className: "dt-center", "targets": [ 0 ] },
@@ -604,7 +574,7 @@
 					{ className: "dt-center", "targets": [ 2 ] },
 					{ className: "dt-center", "targets": [ 3 ] }
 				],
-				"bFilter": false, // hide search box for table
+				//"bFilter": false, // hide search box for table
 				'iDisplayLength': -1,
 				"lengthMenu": [ [10, 20, -1], [10, 20, "All"] ], // Number to display
 				
@@ -798,28 +768,54 @@
 				//runQuery(); // runQuery run from customNumberDevicesSelect
 
 			});
-			dropdownOS.on('change', function(e, selection) { 
-				propertiesList['dropdownOSString'] = selection;
-
-				setChosenAppNames();
+			
+			eventSelect.on('change', function(e, eventName) {
+				console.log("Event change", eventName);
+				clearChosen(chosenNames[0]);
+				clearChosen(chosenNames[1]);
+				clearChosen(chosenNames[2]);
+				getDropdownMenuData(chosenNames[0]);
+				getDropdownMenuData(chosenNames[1]);
+				getDropdownMenuData(chosenNames[2]);
 				runQuery();
 			});
-			eventSelect.on('change', function(e, eventName) {
-				setChosenAppNames();
-				runQuery();
+			$( ".chosen-platform" ).change(function() {
+				var selectedPlatforms = $('.chosen-platform').chosen().val()
+				console.log("Change Platform", selectedPlatforms);
+				clearChosen(chosenNames[1]);
+				clearChosen(chosenNames[2]);
+				updateFilterString(chosenNames[0]);
+				getDropdownMenuData(chosenNames[1]);
+				getDropdownMenuData(chosenNames[2]);
 			});
 			$( ".chosen-appName" ).change(function() {
 				var selectedAppNames = $('.chosen-appName').chosen().val()
-				updateAppName(selectedAppNames);
+				console.log("Change appName", selectedAppNames);;
+				clearChosen(chosenNames[2]);
+				updateFilterString(chosenNames[1]);
+				getDropdownMenuData(chosenNames[2]);
+				//var appNameString = updatePropertyString(selectedAppNames, 'App Name');
+				//propertiesList.property = appNameString;
 				runQuery();
 			});
 			$( ".chosen-model" ).change(function() {
 				var selectedDeviceModels = $('.chosen-model').chosen().val()
-				propertiesList['dropdownDeviceModelString'] = selectedDeviceModels;
+				console.log("Change model", selectedDeviceModels);
+				updateFilterString(chosenNames[2]);
+				//var selectedDeviceModels = $('.chosen-model').chosen().val()
+				//propertiesList['dropdownDeviceModelString'] = selectedDeviceModels;
 				// Update for selected devices
-				adjustDataForSelectedDeviceModels();
+				//adjustDataForSelectedDeviceModels();
+				runQuery();
 			});
 			dropdownDates.on('change', function(e, selection){
+				// Possibility that selections may not be valid following period change
+				// (i.e. from custom period to a set period, options may no longer be valid)
+				
+				clearChosen(chosenNames[0]);
+				clearChosen(chosenNames[1]);
+				clearChosen(chosenNames[2]);
+				getDropdownMenuData(chosenNames[0]);
 				updateTime(selection);
 				runQuery();
 			});
@@ -835,7 +831,13 @@
 						// prevent users from selecting dates past the 'to' date
 						$( "#to" ).datepicker( "option", "minDate", selectedDate );
 						propertiesList["from"] = selectedDate;
-						setChosenAppNames();
+						// Since updating the to date could affect what platforms are available,
+						// reset platform, app, and model selections
+						clearChosen(chosenNames[0]);
+						clearChosen(chosenNames[1]);
+						clearChosen(chosenNames[2]);
+						getDropdownMenuData(chosenNames[0]);
+						//setChosenAppNames();
 						runQuery();
 					}
 				});
@@ -850,7 +852,14 @@
 						// prevent users from selecting dates before the 'from' date
 						$( "#from" ).datepicker( "option", "maxDate", selectedDate );
 						propertiesList["to"] = selectedDate;
-						setChosenAppNames();
+						// Since updating the from date could affect what platforms are available,
+						// reset platform, app, and model selections
+						clearChosen(chosenNames[0]);
+						clearChosen(chosenNames[1]);
+						clearChosen(chosenNames[2]);
+						getDropdownMenuData(chosenNames[0]);
+
+						//setChosenAppNames();
 						runQuery();
 					}
 				});
@@ -860,7 +869,7 @@
 				//var userPass = document.getElementById('tbxNumResultsSelect');
 				var textboxValue = tbxNumResultsSelect.value
 				propertiesList['limit'] = textboxValue;
-				runQuery();
+				//runQuery();
 				//alert(textboxValue);
 				
 			});
