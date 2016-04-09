@@ -457,7 +457,9 @@
 				var plotLimit = (propertiesList.limit <= 100) ? propertiesList.limit : 100;
 				var plotData = [];
 				var otherDevicesCategory = 0;
+				
 				if (propertiesList.deviceFilterNumbers){
+					console.log("TESTING plotGraph",propertiesList.deviceFilterNumbers );
 					otherDevicesCategory = 1;
 					var sum = 0;
 					for (var i = 0; i < propertiesList.deviceFilterNumbers.length; i++){
@@ -792,6 +794,7 @@ function updateDataTablesSearch(data){
 		.search( '' )
 		.columns().search( '' )
 		.draw();
+	propertiesList.deviceFilterNumbers = null;
 	}
 }
 
