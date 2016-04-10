@@ -75,6 +75,7 @@
 			// Limiting variables for graph display
 			var graphNumberLimit = 20; // maximum number of items for pie chart (switches to bar chart after)
 			var graphDisplayUpperLimit = 100; // maximum number for display regardless of custom input
+			
 			// Set initial properties required for segmentation
 			var propertiesList = {
 				appNameString : null,
@@ -137,9 +138,8 @@
 					// Hide datepicker and set time data
 					propertiesList["limit"] = numDevices;
 					$(".tbxNumSelect").hide();
+					// Use last pulled server data to recompute list
 					plotData(lastDataPull);
-					//runQuery();
-					table.draw();
 				}
 			}
 		  
@@ -170,23 +170,23 @@
 			var dropdownLimit = $('#numResultsSelect').MPSelect(limitOptions); // limit Options  
 			var dropdownDates = $('#timeSelect').MPSelect(dateOptions);     // date Options
 			
-		
+			// Function to update the Chosen dropdown menu selections
+			// Input: chosenNames dataset for identification parameters, data, an 
+			//		array of names
 			function updateChosen(chosenName, data){
 				$(chosenName.chosenID).chosen(); // Initialize chosen plugin searchbox
 				if (data){
 					for (var i = 0; i < data.length; i++){
 						newKey = data[i];
-						$(chosenName.chosenID).append("<option value='"+newKey+"'>"+newKey +"</option>");
-						
+						$(chosenName.chosenID).append("<option value='"+
+							newKey+"'>"+newKey +"</option>");
 					}
-					// Update MUST be outside of loop otherwise will lag system incredibly 
-					// with large input size
+					// trigger update once all elements have been added
 					$(chosenName.chosenID).trigger("chosen:updated");
 				}
 				else{
-					alert("updateChosen, no data");
-				}
-				
+					console.log("updateChosen, no data");
+				}		
 			}
 		  
 			// Function to clear the Chosen Menu Options (essentially reset them),
@@ -203,7 +203,7 @@
 				if (chosenName.chosenTitle === '$model'){
 					updateDataTablesSearch(null);
 				}
-				updateFilterString(chosenName);
+				//updateFilterString(chosenName);
 			}
 			
 			function updateFilterString(chosenName){
@@ -212,7 +212,7 @@
 					var outputString = '(';
 					var leftSideEquivalencyTest = 'event.properties["' + chosenName.chosenTitle + '"] === ';
 					if (itemList[0].length > 1){
-						outputString += '"' + leftSideEquivalencyTest + itemList[0] + '"';
+						outputString += leftSideEquivalencyTest + '"' + itemList[0] + '"';
 					}
 					else{
 						outputString += leftSideEquivalencyTest + itemList[0];
@@ -220,7 +220,7 @@
 					
 					for (var i = 1; i < itemList.length; i++){
 						if (itemList[i].length > 1){
-							outputString += ' || "' + leftSideEquivalencyTest + itemList[0] + '"';
+							outputString += ' || ' + leftSideEquivalencyTest + '"' + itemList[0] + '"';
 						}
 						else{
 							outputString += ' || ' + leftSideEquivalencyTest + itemList[i];
