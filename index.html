@@ -793,6 +793,7 @@ function updateDataTablesSearch(data){
 		.search( '' )
 		.columns().search( '' )
 		.draw();
+	propertiesList.deviceFilterNumbers = null;
 	}
 }
 
@@ -849,6 +850,7 @@ DONE TESTING
 				updateFilterString(chosenNames[0]);
 				getDropdownMenuData(chosenNames[1]);
 				getDropdownMenuData(chosenNames[2]);
+				runQuery();
 			});
 			$( ".chosen-appName" ).change(function() {
 				var selectedAppNames = $('.chosen-appName').chosen().val()
