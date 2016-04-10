@@ -192,7 +192,7 @@
 			// Function to clear the Chosen Menu Options (essentially reset them),
 			// 		propertiesList relevant String variable has to be cleared for new
 			// 		custom_query call
-			// Inputs: chosenID (i.e. '.chosen-appName')
+			// Inputs: chosenNames dataset for identification parameters
 			function clearChosen(chosenName){
 				// Clear String property
 				propertiesList[chosenName.chosenStringName] = null;
@@ -200,42 +200,59 @@
 				$(chosenName.chosenID).children().remove();
 				// clear chosen dropdown selected values
 				$(chosenName.chosenID).val('').trigger("chosen:updated");
+				// Clear table and graph search criteria
 				if (chosenName.chosenTitle === '$model'){
 					updateDataTablesSearch(null);
 				}
-				//updateFilterString(chosenName);
 			}
 			
+			// Function to update the filter strings sent into custom query
+			// Strings should have format of similar to:
+			//		'(event.properties["App Name"] === "Friends" ||
+			//		event.properties["App Name"] === "Robots") '
+			// Inputs: chosenNames dataset for identification parameters
 			function updateFilterString(chosenName){
+				// pull array of selected items
 				var itemList = $(chosenName.chosenID).chosen().val();
 				if (itemList){
 					var outputString = '(';
-					var leftSideEquivalencyTest = 'event.properties["' + chosenName.chosenTitle + '"] === ';
+					// build the 'event.properties["App Name"] === ' part of the string
+					var leftSideEquivalencyTest = 'event.properties["' + chosenName.
+						chosenTitle + '"] === ';
+					// Due to test cases having numerical values, have created possibility
+					// but may become invalid if new options that are non-numerical and of
+					// length 1 come into play
 					if (itemList[0].length > 1){
 						outputString += leftSideEquivalencyTest + '"' + itemList[0] + '"';
 					}
+					// Numeric entry option
 					else{
 						outputString += leftSideEquivalencyTest + itemList[0];
 					}
 					
+					// Add in the || other event.properties segments
 					for (var i = 1; i < itemList.length; i++){
+						// String entry
 						if (itemList[i].length > 1){
 							outputString += ' || ' + leftSideEquivalencyTest + '"' + itemList[0] + '"';
 						}
+						// Numeric entry
 						else{
 							outputString += ' || ' + leftSideEquivalencyTest + itemList[i];
 						}
 					}
 					outputString += ')';
+					// set propertiesList variable for use elsewhere
 					propertiesList[chosenName.chosenStringName] = outputString;
 				}
+				// nothing was selected therefore set to null
 				else {
 					propertiesList[chosenName.chosenStringName] = null;
 				}
-				
 			}
 
-
+			// Function to get data for the dropdown menus based on existing criteria
+			// Inputs: chosenNames dataset for identification parameters
 			function getDropdownMenuData(chosenName){
 				var params = {
 					from_date: propertiesList.from,
@@ -245,20 +262,24 @@
 				var script = stringBuilderChosenOptions(chosenName.chosenTitle, 0);
 				MP.api.custom_query(script, params).done(function(results) {
 					updateChosen(chosenName, results[0]);
-					console.log("getDropdownMenuData", results, script);
 				});		
 			}
 			
-			// Selector == 0, retrieve menu data
-			// Selector == 1, 
-			// Selector == 2, retrieve table data
-			
+			// Function to build the script for use in custom_query commands
+			// Inputs: propertySelector, the string variant of the field 
+			//		name to be groupedBy,
+			//		selector, a variable determining if it's retrieving menu 
+			//		data or usable data
+			// 		selector == 0, retrieve menu data
+			// 		selector == 1, retrieve table data
 			function stringBuilderChosenOptions(propertySelector, selector){
 				var startFunction = 'function main() { \
 					return Events({from_date: params.from_date,\
 						to_date: params.to_date,\
 						event_selectors: [{event: params.event}]})';
+				// filter by event
 				var eventFilter = '.filter(function(event) { return (event.name === params.event ) })';
+				// filter by properties (Platform, App Name, and $model)
 				var propertyFilters = '';
 				if (propertiesList.platformString){
 					propertyFilters += '.filter(function(event) { return (' + propertiesList.platformString +' ) })';
@@ -276,7 +297,7 @@
 				switch (selector) {
 					case 0:
 						groupByString = '.groupBy(["properties.'+ propertySelector +'"], mixpanel.reducer.count())';
-						
+						// reducer function to parse data specifically for menu lists
 						reducer = 
 							'.reduce(function(previousData, object){\
 								var allData = [];\
@@ -297,7 +318,7 @@
 					case 1:
 						groupByString = '.groupByUser(["properties.$model"],mixpanel.reducer.count())\
 							.groupBy(["key.1"], mixpanel.reducer.count())';
-						
+						// reducer function to bring data into [device name, value] sub-arrays
 						reducer =
 							'.reduce(function(previousData, object){\
 								var allData = [];\
@@ -314,6 +335,7 @@
 								}\
 								return allData;\
 							})'
+						// map to restructure the data to [rank, device name, value, percentage]
 						map = 
 							'.map(function(event){\
 								function sortByValue(a, b) {\
@@ -331,52 +353,53 @@
 									total += event[i][1];\
 								}\
 								for (i = 0; i < event.length; i++){\
-									var element = [i+1, event[i][0], event[i][1], parseFloat(event[i][1] / total * 100).toFixed(2)];\
+									var element = [i+1, event[i][0], event[i][1], parseFloat(event[i][1] \
+									/ total * 100).toFixed(2)];\
 									allData.push(element);\
 								}\
 								return allData;\
 							})'
 						break;
 					default:
-						alert("stringBuilderChosenOptions, incorrect selector value");
+						console.log("stringBuilderChosenOptions, incorrect selector value");
 				}
-				
+				// Build the whole script and return
 				outputString = startFunction + eventFilter + propertyFilters + groupByString + reducer + map + '}';
 				return outputString;
-			
 			}
 
+			// Function to pull data and plot it
 			function runQuery(){
-				var chosenID = ['.chosen-model', '.chosen-appName', '.chosen-platform'];
-				
 				var eventName = eventSelect.MPEventSelect('value');
 				var initialParams = {from_date : propertiesList["from"], to_date : 
 									propertiesList["to"]};
-									
-
 				if (eventName) {
-					// Get custom query data
 					// Parameters for custom query
 					var params = {
 						from_date: propertiesList.from,
 						to_date: propertiesList.to,
 						event: eventSelect.MPEventSelect('value')
 					};
+					// Build script
 					var script = stringBuilderChosenOptions('$model', 1);
+					// Get device data
 					MP.api.custom_query(script, params).done(function(results) {
-						
+						// store data for use in dropdown and limit functions
 						lastDataPull = results[0];
+						// Calculate total users and build sorted device list
 						parseBaseData(results[0]);
+						// Plot data
 						plotData(results[0]);
-						
 					});
-
 				}
 			};
 			
+			// Function to convert Array data to a JSON object for MPCharts
+			// Input: Array of [Device Name, Number of Users] sub-arrays
 			function convertArrayToJSON(data){
 				outputData = {};
 				var element;
+				// Enter each data point in Key : Value pairs into Object
 				for (var i = 0; i < data.length; i++){
 					element = data[i];
 					outputData[element[0]] = element[1];
@@ -384,8 +407,9 @@
 				return outputData
 			}
 		  
-			// Set default variables, note time delay may need to be increased if it fails 
-			// to load appropriately
+			// Function to set default variables (Event === 'App Started'), 
+			//		note time delay may need to be increased if it fails to 
+			//		load appropriately
 			function setDefaultEvent(){
 				setTimeout(function() {
 					$('#eventSelect').val('App Started');
@@ -393,14 +417,25 @@
 			}
 			setDefaultEvent();
 			
-			// Setting === 0 means it's already in [Name, value] pairs
-			// Setting === 1 means it's still in 4 cell arrays
+			// Function to reorganize the data to limit parameter constraints
+			// Inputs: data, an Array of sub-arrays (defined below),
+			//			limit, Integer value of maximum allowed devices,
+			//			setting, Integer value depending on structure of input
+			//			data
+			// setting === 0 means it's already in [Name, value] pairs
+			// setting === 1 means it's still in [Rank, Name, value, percentage]
+			//					sub-arrays
 			function reduceLength(data, limit, setting){
 				var newData = [];
+				// Make sure the data needs to be modified
 				if (data.length > limit){
 					var sum = 0;
+					// determine input data structure
 					if (setting === 0){
 						for (var i = 0; i < limit; i++){
+							// Consider using a splice here since the structure
+							// remains the same but for loop still needed for
+							// sum
 							var value = parseInt(data[i][1]);
 							newData.push([data[i][0],value]);
 							sum += value;
@@ -413,54 +448,72 @@
 							sum += value;
 						}
 					}
+					// Create Other Devices entry
 					newData.push(["Other Devices", totalNumUsers - sum]);
 				}
 				return newData;
 			}
 			
+			// Function to sort a list with, smallest to largest
 			function sortByValue(a, b) {
 				if (a === b) {
 					return 0;
 				}
 				else {
-					return (a < b) ? -1 : 1; // largest to smallest
+					return (a < b) ? -1 : 1;
 				}
 			}
+			
+			// Function to plot a graph using MPCharts
+			// Input: dataSet, array of [Rank, Device Name, Num Users, Percentage Users]
 			function plotGraph(dataSet){
-			// Devices have been selected
-			if (dataSet){
-				var plotLimit = (propertiesList.limit <= graphDisplayUpperLimit) ? propertiesList.limit : graphDisplayUpperLimit;
+				// Verify there is data to plot
+				if (dataSet){
+					// determine plotting limit
+					var plotLimit = (propertiesList.limit <= graphDisplayUpperLimit) ?
+							propertiesList.limit : graphDisplayUpperLimit;
 					var plotData = [];
+					// selector for whether plotData has an Other Devices sub-array
 					var otherDevicesCategory = 0;
+					// Devices were selected therefore screen for them
 					if (propertiesList.deviceFilterNumbers){
 						otherDevicesCategory = 1;
 						var sum = 0;
+						// Go through each selected device and pull it from the overall list
+						// using its recorded index number and add to new list
 						for (var i = 0; i < propertiesList.deviceFilterNumbers.length; i++){
 							var index = propertiesList.deviceFilterNumbers[i]-1;
 							plotData.push([dataSet[index][1], dataSet[index][2]]);
 							sum += dataSet[index][2];
 						}
-
+						// The number of devices selected were greater than the limit
+						// Filter by limit
 						if (plotData.length > plotLimit){
 							plotData = reduceLength(plotData, plotLimit, 0);
 						}
+						// Limit is not violated, add Other Devices column here
 						else{
 							plotData.push(["Other Devices", totalNumUsers - sum]);
 						}
 					}
+					// Devices were not selected
 					else {
+						// Limit exceeded, filter by limit
 						if (dataSet.length > plotLimit){
 							otherDevicesCategory = 1;
 							plotData = reduceLength(dataSet, plotLimit, 1);
 						}
+						// Limit is not exceeded, copy relevant data to plotData
 						else {
 							for (var i = 0; i < dataSet.length;i++){
 								plotData.push([dataSet[i][1], dataSet[i][2]]);
 							}
 						}
-						
 					}
-					// Graph the data
+					// GRAPH SEGMENT
+					// Must remove the old graph then create a new one to accommodate
+					// changes to chart type
+					
 					// Delete the old table
 					if (eventGraph.length > 0) {
 						eventGraph.remove();
@@ -468,7 +521,8 @@
 					// Create a new table
 					eventGraph = $('<div id="#graph" />')
 					$(".mixpanel-platform-section").after(eventGraph)
-	//6. Add text showing Total Devices, Total Users, etc., number of devices (x of total) -20 to 30 probably (readability)
+					
+					// Setup graph titles
 					var titleString = (plotData.length - otherDevicesCategory).toString() + ' devices shown of ' + deviceList.length;
 					var subTitleString = 'Total users: ' + totalNumUsers;
 					var fontSettings = { "color": "#333333", "fontSize": "18px" };
@@ -485,7 +539,7 @@
 									style: fontSettings
 								}
 					// Select display type based on number of datapoints
-					if (dataSet.length <= graphNumberLimit + 1){
+					if (plotData.length <= graphNumberLimit + 1){
 						eventGraph.MPChart({chartType: 'pie',
 							highchartsOptions: {
 								title: titleSettings,
@@ -496,28 +550,18 @@
 					else {
 						eventGraph.MPChart({chartType: 'bar',
 							highchartsOptions: {
-								title: {
-									align : 'center',
-									floating : true,
-									text: titleString,
-									style: fontSettings
-								},
-								subtitle: {
-									align : 'center',
-									floating : true,
-									text: subTitleString,
-									style: fontSettings
-								}
+								title: titleSettings,
+								subtitle: subTitleSettings
 							}
 						});
 					}
 					// Convert data back to acceptable form for MPChart
 					var graphData = convertArrayToJSON(plotData); 
 					eventGraph.MPChart('setData', graphData);
-			}
-			else{
-				console.log("Warning: plotGraph, no DATA!");
-			}
+				}
+				else{
+					console.log("Warning: plotGraph, no DATA!");
+				}
 				
 			}
 	
@@ -528,7 +572,9 @@
 			// Function to create dataTable using jQuery plug-in, dataTables
 			// Inputs: dataSet, an object of Device : value pairings
 			function plotData(dataSet){
+				// Graph data
 				plotGraph(dataSet);
+				
 				// Generate dataTable Variables
 				var titleArray = [{title : "Rank"},
 					  {title : "Device Name"}, 
@@ -538,89 +584,69 @@
 				// Destroy the old table so it can be replaced with new data
 				table.destroy();
 				$('#dataTable').empty(); // empty in case the columns change
+				// Set up table footer
 				var columnString = '<tfoot><tr><th></th><th></th><th></th><th> \
-									</th></tr></tfoot>'; // For table footer below
+									</th></tr></tfoot>'; 
 				$("#dataTable").append(columnString);
 				
 				// Create a new table
 				table = $('#dataTable').DataTable( {
-				data: dataSet,
-				columns: titleArray,
-				"columnDefs": [
-					{ className: "dt-center", "targets": [ 0 ] },
-					{ className: "dt-center", "targets": [ 1 ] },
-					{ className: "dt-center", "targets": [ 2 ] },
-					{ className: "dt-center", "targets": [ 3 ] }
-				],
-				sDom : '<"top">tip', // hide search box
-				//"searching": false,
-				//"bFilter": false, // hide search box for table
-//				'iDisplayLength': -1,
-				//"lengthMenu": [ [10, 20, -1], [10, 20, "All"] ], // Number to display
-				"iDisplayLength": propertiesList.limit, // Set to dropdown menu value
-				"bLengthChange": false, // Hide dataTable option
-				// Create Footer with sums
-				"footerCallback": function ( row, data, start, end, display ) {
-					var api = this.api(), data;
+					data: dataSet,
+					columns: titleArray,
+					"columnDefs": [
+						{ className: "dt-center", "targets": [ 0 ] },
+						{ className: "dt-center", "targets": [ 1 ] },
+						{ className: "dt-center", "targets": [ 2 ] },
+						{ className: "dt-center", "targets": [ 3 ] }
+					],
+					sDom : '<"top">tip', // hide search box
+					// Set display limit to dropdown menu value
+					"iDisplayLength": propertiesList.limit, 
+					// Hide dataTable display X items option
+					"bLengthChange": false, 
+					// Create Footer with sums/percentages
+					"footerCallback": function ( row, data, start, end, display ) {
+						var api = this.api(), data;
 
-					// Remove the formatting to get integer data for summation
-					var intVal = function ( i ) {
-						return typeof i === 'string' ?
-							i.replace(/[\$,]/g, '')*1 :
-							typeof i === 'number' ?
-								i : 0;
-					};
+						// Remove the formatting to get integer data for summation
+						var intVal = function ( i ) {
+							return typeof i === 'string' ?
+								i.replace(/[\$,]/g, '')*1 :
+								typeof i === 'number' ?
+									i : 0;
+							};
 
-					// Total number of users over all pages
-					total = totalNumUsers;
-					/*
-					total = api
-						.column( 2 )
-						.data()
-						.reduce( function (a, b) {
-							return intVal(a) + intVal(b);
-						} );
-					*/
-					totalNumDevices = deviceList.length;
+						// Total number of users over all pages
+						total = totalNumUsers;
 
-					// Total number of users over this page
-					pageTotal = api
-						.column( 2, { page: 'current'} )
-						.data()
-						.reduce( function (a, b) {
-							return intVal(a) + intVal(b);
-						}, 0 );
-					/*
-					// Total percentage of users over this page
-					pagePercentTotal = api
-						.column( 3, { page: 'current'} )
-						.data()
-						.reduce( function (a, b) {
-							return intVal(a) + intVal(b);
-						}, 0 );
-					*/
+						totalNumDevices = deviceList.length;
 
-					// Update footer
-					$( api.column( 2 ).footer() ).html(
-						'Unique Users: ' + pageTotal +' / ' + total
-					);
-					pagePercentTotal = parseFloat((pageTotal/total)*100).toFixed(2);
-					$( api.column( 3 ).footer() ).html(
-						
-						'Usage (%): ' + pagePercentTotal +' / 100.00'
-					);
+						// Total number of users over this page
+						pageTotal = api
+							.column( 2, { page: 'current'} )
+							.data()
+							.reduce( function (a, b) {
+								return intVal(a) + intVal(b);
+							}, 0 );
 
-					// Label for device total in footer (static)
-					$( api.column( 0 ).footer() ).html(
-						'Total Number of Devices: ' + totalNumDevices
-					);
+						// Update footer
+						// Set Number of Unique users on page
+						$( api.column( 2 ).footer() ).html(
+							'Unique Users: ' + pageTotal +' / ' + total
+						);
+						// Set Percentage of Unique users on page
+						pagePercentTotal = parseFloat((pageTotal/total)*100).toFixed(2);
+						$( api.column( 3 ).footer() ).html(
+							
+							'Usage (%): ' + pagePercentTotal +' / 100.00'
+						);
 
-
-
+						// Set number of devices overall
+						$( api.column( 0 ).footer() ).html(
+							'Total Number of Devices: ' + totalNumDevices
+						);
 					}
-
 				});
-
 			}
 
 			// Provided by MixPanel staff with minor modifications to account
@@ -749,73 +775,72 @@
 				return true;
 			} /* end download() */
 
-/*
-TESTING
-*/
+			// Function to update the datatables search results using the Chosen dropdown
+			// Note, this system requires a sorted list as it searches by index value due
+			// device names sometimes having spaces which DataTables interprets as a split
+			// to a new device.
+			// Inputs: data, an array of device names
+			function updateDataTablesSearch(data){
+				// Since the search function doesn't work for names with spaces, search by index value
+				if (data){
+					// Find index of each device
+					var indexValues = [];
+					for (var i = 0; i < data.length; i++){
+						if (data[i]){
+							// deviceList is assumed to be sorted based on # of users
+							indexValues.push(($.inArray(data[i], deviceList) + 1)); 
+						}
+						else{
+							indexValues.push(($.inArray('null', deviceList) + 1)); 
+						}
+					}
+					// Create search string, additions on left and right side are so
+					// DataTables uses the exact value otherwise it would show everything
+					// that had a partial match as well (i.e. 7 would return 7, 17, 27, 70, etc.)
+					var itemString = "^\\s*"+indexValues[0].toString()+"\\s*$" ;		
+					for (var i = 1; i < indexValues.length; i++){
+						itemString += '|' + "^\\s*"+indexValues[i].toString()+"\\s*$"  ;
+					}
+					// Order the list for use in other functions
+					indexValues.sort(sortByValue);
+					// Store index values
+					propertiesList.deviceFilterNumbers = indexValues;
+					// Search the table and draw the output
+					table.column(0).search(itemString, true, false, true).draw();	
+				}
+				// In event search criteria have been cleared, clear the table and
+				// the stored values
+				else{
+					table
+						.search( '' )
+						.columns().search( '' )
+						.draw();
+					propertiesList.deviceFilterNumbers = null;
+				}
+			}
 
-function updateDataTablesSearch(data){
-	// Since the search function doesn't work for names with spaces, search by index value
-	if (data){
-		// Find index of each device
-		var indexValues = [];
-		for (var i = 0; i < data.length; i++){
-			if (data[i]){
-				// deviceList is assumed to be sorted based on # of users
-				indexValues.push(($.inArray(data[i], deviceList) + 1)); 
+			// Function to parse and store a list of the sorted Device Names (sorted by number of users) and calculate the total number of users
+			// Input: data, array of [Rank, Device Name, Num Users, Percentage Users]
+			function parseBaseData(data){
+				deviceList = [];
+				totalNumUsers = 0;
+				if (data){
+					for (var i = 0; i < data.length;i++){
+						var deviceName = data[i][1];
+						// Compensate for 'null' entry (shows up in test data)
+						if (!deviceName){
+							deviceName = "null";
+						}
+						deviceList.push(deviceName);
+						totalNumUsers += data[i][2];
+					}
+				}
+				else{
+					console.log("parseBaseData, no data provided");
+				}
 				
 			}
-			else{
-				indexValues.push(($.inArray('null', deviceList) + 1)); 
-			}
-			
-		}
-		// Create search string
-		
-		var itemString = "^\\s*"+indexValues[0].toString()+"\\s*$" ;		
-		for (var i = 1; i < indexValues.length; i++){
-			itemString += '|' + "^\\s*"+indexValues[i].toString()+"\\s*$"  ;
-		}
-		indexValues.sort(sortByValue);
-		propertiesList.deviceFilterNumbers = indexValues;
-	
-	// Search the table and draw the output
-	table.column(0).search(itemString, true, false, true).draw();	
-//	console.log("updateDataTablesSearch", data, indexValues, deviceList);
-	}
-	// In event search criteria have been cleared, clear the table
-	else{
-	table
-		.search( '' )
-		.columns().search( '' )
-		.draw();
-	propertiesList.deviceFilterNumbers = null;
-	}
-}
 
-
-function parseBaseData(data){
-	deviceList = [];
-	totalNumUsers = 0;
-	if (data){
-		for (var i = 0; i < data.length;i++){
-			var deviceName = data[i][1];
-			// Compensate for 'null' entry (shows up in test data)
-			if (!deviceName){
-				deviceName = "null";
-			}
-			deviceList.push(deviceName);
-			totalNumUsers += data[i][2];
-		}
-	}
-	else{
-		console.log("parseBaseData, no data provided");
-	}
-	
-}
-
-/*
-DONE TESTING
-*/
 			/*
 			ON CHANGE effects
 			*/
@@ -859,8 +884,6 @@ DONE TESTING
 				clearChosen(chosenNames[2]);
 				updateFilterString(chosenNames[1]);
 				getDropdownMenuData(chosenNames[2]);
-				//var appNameString = updatePropertyString(selectedAppNames, 'App Name');
-				//propertiesList.property = appNameString;
 				runQuery();
 			});
 			$( ".chosen-model" ).change(function() {
@@ -869,15 +892,8 @@ DONE TESTING
 				updateFilterString(chosenNames[2]);
 				updateDataTablesSearch(selectedDeviceModels);
 				plotGraph(lastDataPull);
-				//var selectedDeviceModels = $('.chosen-model').chosen().val()
-				//propertiesList['dropdownDeviceModelString'] = selectedDeviceModels;
-				// Update for selected devices
-				//adjustDataForSelectedDeviceModels();
-				//runQuery();
 			});
 			dropdownDates.on('change', function(e, selection){
-				// Possibility that selections may not be valid following period change
-				// (i.e. from custom period to a set period, options may no longer be valid)
 				updateTime(selection);
 				clearChosen(chosenNames[0]);
 				clearChosen(chosenNames[1]);
@@ -900,15 +916,12 @@ DONE TESTING
 						// prevent users from selecting dates past the 'to' date
 						$( "#to" ).datepicker( "option", "minDate", selectedDate );
 						propertiesList["from"] = selectedDate;
-						// Since updating the to date could affect what platforms are available,
-						// reset platform, app, and model selections
 						clearChosen(chosenNames[0]);
 						clearChosen(chosenNames[1]);
 						clearChosen(chosenNames[2]);
 						getDropdownMenuData(chosenNames[0]);
 						getDropdownMenuData(chosenNames[1]);
 						getDropdownMenuData(chosenNames[2]);
-						//setChosenAppNames();
 						runQuery();
 					}
 				});
@@ -923,29 +936,21 @@ DONE TESTING
 						// prevent users from selecting dates before the 'from' date
 						$( "#from" ).datepicker( "option", "maxDate", selectedDate );
 						propertiesList["to"] = selectedDate;
-						// Since updating the from date could affect what platforms are available,
-						// reset platform, app, and model selections
 						clearChosen(chosenNames[0]);
 						clearChosen(chosenNames[1]);
 						clearChosen(chosenNames[2]);
 						getDropdownMenuData(chosenNames[0]);
 						getDropdownMenuData(chosenNames[1]);
 						getDropdownMenuData(chosenNames[2]);
-
-						//setChosenAppNames();
 						runQuery();
 					}
 				});
 			});
 			// Limit Device Textbox
 			$("#btnNumDevicesSubmit").click(function () {	
-				//var userPass = document.getElementById('tbxNumResultsSelect');
 				var textboxValue = tbxNumResultsSelect.value
 				propertiesList['limit'] = textboxValue;
-				plotData(lastDataPull);
-				//runQuery();
-				//alert(textboxValue);
-				
+				plotData(lastDataPull);		
 			});
 		</script>
 	</body>
