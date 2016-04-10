@@ -72,6 +72,9 @@
 		<div style="clear: both;"></div><br>
 		<button onclick="exportToCSV()" style="float: right;">Download CSV</button>
 		<script>
+			// Limiting variables for graph display
+			var graphNumberLimit = 20; // maximum number of items for pie chart (switches to bar chart after)
+			var graphDisplayUpperLimit = 100; // maximum number for display regardless of custom input
 			// Set initial properties required for segmentation
 			var propertiesList = {
 				appNameString : null,
@@ -88,8 +91,6 @@
 			];
 			// Initial variables
 			var eventSelect = $('#eventSelect').MPEventSelect();
-			var graphNumberLimit = 20; 	// Note: +1 in implementation for Totals column 
-										// from Limit Field
 			var eventGraph = $('#graph');
 		
 			// Initialize Chosen Interface
@@ -209,10 +210,21 @@
 				var itemList = $(chosenName.chosenID).chosen().val();
 				if (itemList){
 					var outputString = '(';
-					var leftSideEquivalencyTest = 'event.properties["' + chosenName.chosenTitle + '"] === "';
-					outputString += leftSideEquivalencyTest + itemList[0] + '"';
+					var leftSideEquivalencyTest = 'event.properties["' + chosenName.chosenTitle + '"] === ';
+					if (itemList[0].length > 1){
+						outputString += '"' + leftSideEquivalencyTest + itemList[0] + '"';
+					}
+					else{
+						outputString += leftSideEquivalencyTest + itemList[0];
+					}
+					
 					for (var i = 1; i < itemList.length; i++){
-						outputString += ' || ' + leftSideEquivalencyTest + itemList[i] + '"';
+						if (itemList[i].length > 1){
+							outputString += ' || "' + leftSideEquivalencyTest + itemList[0] + '"';
+						}
+						else{
+							outputString += ' || ' + leftSideEquivalencyTest + itemList[i];
+						}
 					}
 					outputString += ')';
 					propertiesList[chosenName.chosenStringName] = outputString;
@@ -281,12 +293,6 @@
 								}\
 								return allData;\
 							})'
-						/*
-						reducer = '.reduce(function(previousData, object){var outputData = [];\
-						for (var i = 0; i < object.length; i++){\
-							itemName = object[i].key["0"];\
-						outputData.push(itemName);}return outputData;})'
-						*/
 						break;
 					case 1:
 						groupByString = '.groupByUser(["properties.$model"],mixpanel.reducer.count())\
@@ -330,40 +336,6 @@
 								}\
 								return allData;\
 							})'
-						
-						/*
-						reducer = '.reduce(function(previousData, object){\
-							function sortByValue(a, b) {\
-							if(a[1] === b[1]) {return 0;}\
-							else {return (a[1] < b[1]) ? 1 : -1; }};\
-							var partialData = [];var allData = [];var total = 0;\
-							for (var i = 0; i < previousData.length;i++){\
-								var elementPreviousData = previousData[i];\
-								for (var j = 0; j < elementPreviousData.length;j++){\
-									allData.push(elementPreviousData[j]);\
-								}\
-							}\
-							for (i=0; i<object.length;i++){\
-								total = total + object[i].value;\
-								var element = [object[i].key["0"], object[i].value];\
-								partialData.push(element);}\
-							partialData.sort(sortByValue);\
-							for (i=0; i<object.length; i++){\
-								var newElement = [i+1, partialData[i][0], partialData[i][1], \
-									parseFloat(partialData[i][1]/total*100).toFixed(2)];\
-								allData.push(newElement);}\
-							return allData;});';
-						*/
-						/*
-						reducer ='.reduce(function(previousData, object){\
-							var allKeys = [];\
-							allKeys.push(object.length);\
-							for (var i = 0; i < previousData.length; i++) {\
-								allKeys.push(previousData[i]);\
-							}\
-							return allKeys;\
-						});'
-						*/
 						break;
 					default:
 						alert("stringBuilderChosenOptions, incorrect selector value");
@@ -457,7 +429,7 @@
 			function plotGraph(dataSet){
 			// Devices have been selected
 			if (dataSet){
-				var plotLimit = (propertiesList.limit <= 100) ? propertiesList.limit : 100;
+				var plotLimit = (propertiesList.limit <= graphDisplayUpperLimit) ? propertiesList.limit : graphDisplayUpperLimit;
 					var plotData = [];
 					var otherDevicesCategory = 0;
 					if (propertiesList.deviceFilterNumbers){
