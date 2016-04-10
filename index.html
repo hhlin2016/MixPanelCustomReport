@@ -523,7 +523,7 @@
 					$(".mixpanel-platform-section").after(eventGraph)
 					
 					// Setup graph titles
-					var titleString = (plotData.length - otherDevicesCategory).toString() + ' devices shown of ' + deviceList.length;
+					var titleString = (plotData.length - otherDevicesCategory).toString() + ' of ' + deviceList.length + ' devices shown';
 					var subTitleString = 'Total users: ' + totalNumUsers;
 					var fontSettings = { "color": "#333333", "fontSize": "18px" };
 					var titleSettings = {
@@ -578,7 +578,7 @@
 				// Generate dataTable Variables
 				var titleArray = [{title : "Rank"},
 					  {title : "Device Name"}, 
-					  {title : "Number of Unique Users"},
+					  {title : "Unique Users"},
 					  {title : "Usage (%)"}];
 
 				// Destroy the old table so it can be replaced with new data
