@@ -149,9 +149,6 @@
 					{label: '20', value: 20},
 					{label: '50', value: 50},
 					{label: '100', value: 100},
-					{label: '150', value: 150},
-					{label: '200', value: 200},
-					{label: '250', value: 250},
 					{label: 'Select Custom Value: ', value: -1},
 					{label: 'All', value: Infinity}
 				]
@@ -236,6 +233,7 @@
 				var script = stringBuilderChosenOptions(chosenName.chosenTitle, 0);
 				MP.api.custom_query(script, params).done(function(results) {
 					updateChosen(chosenName, results[0]);
+					console.log("getDropdownMenuData", results, script);
 				});		
 			}
 			
@@ -392,12 +390,13 @@
 						to_date: propertiesList.to,
 						event: eventSelect.MPEventSelect('value')
 					};
-					
-					MP.api.custom_query(stringBuilderChosenOptions('$model', 1), params).done(function(results) {
+					var script = stringBuilderChosenOptions('$model', 1);
+					MP.api.custom_query(script, params).done(function(results) {
 						
 						lastDataPull = results[0];
 						parseBaseData(results[0]);
 						plotData(results[0]);
+						
 					});
 
 				}
@@ -457,73 +456,97 @@
 			}
 			function plotGraph(dataSet){
 			// Devices have been selected
+			if (dataSet){
 				var plotLimit = (propertiesList.limit <= 100) ? propertiesList.limit : 100;
-				var plotData = [];
-				var otherDevicesCategory = 0;
-				if (propertiesList.deviceFilterNumbers){
-					otherDevicesCategory = 1;
-					var sum = 0;
-					for (var i = 0; i < propertiesList.deviceFilterNumbers.length; i++){
-						var index = propertiesList.deviceFilterNumbers[i]-1;
-						plotData.push([dataSet[index][1], dataSet[index][2]]);
-						sum += dataSet[index][2];
-					}
-
-					if (plotData.length > plotLimit){
-						plotData = reduceLength(plotData, plotLimit, 0);
-					}
-					else{
-						plotData.push(["Other Devices", totalNumUsers - sum]);
-					}
-				}
-				else {
-					if (dataSet.length > plotLimit){
+					var plotData = [];
+					var otherDevicesCategory = 0;
+					if (propertiesList.deviceFilterNumbers){
 						otherDevicesCategory = 1;
-						plotData = reduceLength(dataSet, plotLimit, 1);
+						var sum = 0;
+						for (var i = 0; i < propertiesList.deviceFilterNumbers.length; i++){
+							var index = propertiesList.deviceFilterNumbers[i]-1;
+							plotData.push([dataSet[index][1], dataSet[index][2]]);
+							sum += dataSet[index][2];
+						}
+
+						if (plotData.length > plotLimit){
+							plotData = reduceLength(plotData, plotLimit, 0);
+						}
+						else{
+							plotData.push(["Other Devices", totalNumUsers - sum]);
+						}
 					}
 					else {
-						for (var i = 0; i < dataSet.length;i++){
-							plotData.push([dataSet[i][1], dataSet[i][2]]);
+						if (dataSet.length > plotLimit){
+							otherDevicesCategory = 1;
+							plotData = reduceLength(dataSet, plotLimit, 1);
 						}
+						else {
+							for (var i = 0; i < dataSet.length;i++){
+								plotData.push([dataSet[i][1], dataSet[i][2]]);
+							}
+						}
+						
 					}
-					
-				}
-				// Graph the data
-				// Delete the old table
-				if (eventGraph.length > 0) {
-					eventGraph.remove();
-				}
-				// Create a new table
-				eventGraph = $('<div id="#graph" />')
-				$(".mixpanel-platform-section").after(eventGraph)
+					// Graph the data
+					// Delete the old table
+					if (eventGraph.length > 0) {
+						eventGraph.remove();
+					}
+					// Create a new table
+					eventGraph = $('<div id="#graph" />')
+					$(".mixpanel-platform-section").after(eventGraph)
+	//6. Add text showing Total Devices, Total Users, etc., number of devices (x of total) -20 to 30 probably (readability)
+					var titleString = (plotData.length - otherDevicesCategory).toString() + ' devices shown of ' + deviceList.length;
+					var subTitleString = 'Total users: ' + totalNumUsers;
+					var fontSettings = { "color": "#333333", "fontSize": "18px" };
+					var titleSettings = {
+									align : 'center',
+									floating : true,
+									text: titleString,
+									style: fontSettings
+								};
+					var subTitleSettings = {
+									align : 'center',
+									floating : true,
+									text: subTitleString,
+									style: fontSettings
+								}
+					// Select display type based on number of datapoints
+					if (dataSet.length <= graphNumberLimit + 1){
+						eventGraph.MPChart({chartType: 'pie',
+							highchartsOptions: {
+								title: titleSettings,
+								subtitle: subTitleSettings
+							}
+						});
+					}
+					else {
+						eventGraph.MPChart({chartType: 'bar',
+							highchartsOptions: {
+								title: {
+									align : 'center',
+									floating : true,
+									text: titleString,
+									style: fontSettings
+								},
+								subtitle: {
+									align : 'center',
+									floating : true,
+									text: subTitleString,
+									style: fontSettings
+								}
+							}
+						});
+					}
+					// Convert data back to acceptable form for MPChart
+					var graphData = convertArrayToJSON(plotData); 
+					eventGraph.MPChart('setData', graphData);
+			}
+			else{
+				console.log("Warning: plotGraph, no DATA!");
+			}
 				
-				var titleString = (plotData.length - otherDevicesCategory).toString() + ' devices shown';
-				// Select display type based on number of datapoints
-				if (dataSet.length <= graphNumberLimit + 1){
-					eventGraph.MPChart({chartType: 'pie',
-						highchartsOptions: {
-							title: {
-								align : 'center',
-								floating : false,
-								text: titleString
-							}
-						}
-					});
-				}
-				else {
-					eventGraph.MPChart({chartType: 'bar',
-						highchartsOptions: {
-							title: {
-								align : 'center',
-								floating : false,
-								text: titleString
-							}
-						}
-					});
-				}
-				// Convert data back to acceptable form for MPChart
-				var graphData = convertArrayToJSON(plotData); 
-				eventGraph.MPChart('setData', graphData);
 			}
 	
 			// DATATABLES IMPLEMENTATION
@@ -801,15 +824,21 @@ function updateDataTablesSearch(data){
 function parseBaseData(data){
 	deviceList = [];
 	totalNumUsers = 0;
-	for (var i = 0; i < data.length;i++){
-		var deviceName = data[i][1];
-		// Compensate for 'null' entry (shows up in test data)
-		if (!deviceName){
-			deviceName = "null";
+	if (data){
+		for (var i = 0; i < data.length;i++){
+			var deviceName = data[i][1];
+			// Compensate for 'null' entry (shows up in test data)
+			if (!deviceName){
+				deviceName = "null";
+			}
+			deviceList.push(deviceName);
+			totalNumUsers += data[i][2];
 		}
-		deviceList.push(deviceName);
-		totalNumUsers += data[i][2];
 	}
+	else{
+		console.log("parseBaseData, no data provided");
+	}
+	
 }
 
 /*
