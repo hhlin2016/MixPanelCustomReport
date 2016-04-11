@@ -11,6 +11,10 @@
 		<script src="https://cdn.mxpnl.com/libs/mixpanel-platform/build/mixpanel-platform.v0.latest.min.js"></script>
 		<script src="https://cdnjs.cloudflare.com/ajax/libs/chosen/1.1.0/chosen.jquery.min.js"></script>
 		<script type="text/javascript" charset="utf8" src="https://cdn.datatables.net/1.10.11/js/jquery.dataTables.js"></script>
+		<script src="customQueryGenerator.js"></script>
+		<script src="exportToCSV.js"></script>
+		<script src="generalFunctionsAndVariables.js"></script>
+		<script src="graphFunctions.js"></script>
 	</head>
 	<body class="mixpanel-platform-body">
 		<div class="mixpanel-platform-section">
@@ -71,315 +75,12 @@
 		<!-- DOWNLOAD BUTTON -->
 		<div style="clear: both;"></div><br>
 		<button onclick="exportToCSV()" style="float: right;">Download CSV</button>
-		<script>
-			// Limiting variables for graph display
-			var graphNumberLimit = 20; // maximum number of items for pie chart (switches to bar chart after)
-			var graphDisplayUpperLimit = 100; // maximum number for display regardless of custom input
-			
-			// Set initial properties required for segmentation
-			var propertiesList = {
-				appNameString : null,
-				platformString : null,
-				deviceModelString: null,
-				from: moment().subtract(1, 'months').format("YYYY-MM-DD"),
-				to: moment().format("YYYY-MM-DD"),
-				limit : 10
-			}
-			var chosenNames = [
-				{ chosenTitle : 'Platform', chosenID : '.chosen-platform', chosenStringName : "platformString"},
-				{ chosenTitle : 'App Name', chosenID : '.chosen-appName', chosenStringName : "appNameString"},
-				{ chosenTitle : '$model', chosenID : '.chosen-model', chosenStringName : "deviceModelString"}
-			];
-			// Initial variables
-			var eventSelect = $('#eventSelect').MPEventSelect();
-			var eventGraph = $('#graph');
-		
-			// Initialize Chosen Interface
-			$('.chosen-model').chosen().val();
-			$('.chosen-platform').chosen().val();
-			$('.chosen-appName').chosen().val();
-			
-			// Store data from last pull (for use with limit changes)
-			var lastDataPull;
-			// Global variables for referencing
-			var deviceList;
-			var totalNumUsers;
-		  
-			// Function to update the selected time from the dropdown menu
-			// Also shows/hides elements relating to the jQuery datePicker
-			// Inputs: 	Integer, period indicating months to go back (-1 denotes
-			// 			custom time period)
-			function updateTime(period) {
-				if (period === -1){
-					// Show datepicker and set time data
-					$("#from").datepicker('setDate', propertiesList["from"]);
-					$("#to").datepicker('setDate', propertiesList["to"]);
-					$(".timeSelectGroup").show();
-				}
-				else {
-					// Hide datepicker and set time data
-					var from_date = moment().subtract(parseInt(period), 
-									'months').format("YYYY-MM-DD");
-					var to_date = moment().format("YYYY-MM-DD");
-					propertiesList["from"] = from_date;
-					propertiesList["to"] = to_date;
-					$(".timeSelectGroup").hide();
+		<script>			
+initialSettings();
+	
+initializeDropdownMenus();
 
-
-				}
-			}
-			
-			function customNumberDevicesSelect(numDevices) {
-				if (numDevices === -1){
-					// Show datepicker and set time data
-					$(".tbxNumSelect").show();
-				}
-				else {
-					// Hide datepicker and set time data
-					propertiesList["limit"] = numDevices;
-					$(".tbxNumSelect").hide();
-					// Use last pulled server data to recompute list
-					plotChart(lastDataPull);
-				}
-			}
-		  
-			//Dropdown Limit Options
-			var limitOptions = {
-				items: [
-					{label: '10', value: 10},
-					{label: '20', value: 20},
-					{label: '50', value: 50},
-					{label: '100', value: 100},
-					{label: 'Select Custom Value: ', value: -1},
-					{label: 'All', value: Infinity}
-				]
-			};
-			
-			// Dropdown Date Options
-			var dateOptions = {
-				items: [
-					{label: '1 month', value: 1},
-					{label: '3 months', value: 3},
-					{label: '6 months', value: 6},
-					{label: '12 months', value: 12},
-					{label: 'Pick a Date Range', value: -1}
-				]
-			};
-
-			// Instantiate dropdown menus
-			var dropdownLimit = $('#numResultsSelect').MPSelect(limitOptions); // limit Options  
-			var dropdownDates = $('#timeSelect').MPSelect(dateOptions);     // date Options
-			
-			// Function to update the Chosen dropdown menu selections
-			// Input: chosenNames dataset for identification parameters, data, an 
-			//		array of names
-			function updateChosen(chosenName, data){
-				$(chosenName.chosenID).chosen(); // Initialize chosen plugin searchbox
-				if (data){
-					for (var i = 0; i < data.length; i++){
-						newKey = data[i];
-						$(chosenName.chosenID).append("<option value='"+
-							newKey+"'>"+newKey +"</option>");
-					}
-					// trigger update once all elements have been added
-					$(chosenName.chosenID).trigger("chosen:updated");
-				}
-				else{
-					console.log("updateChosen, no data");
-				}		
-			}
-		  
-			// Function to clear the Chosen Menu Options (essentially reset them),
-			// 		propertiesList relevant String variable has to be cleared for new
-			// 		custom_query call
-			// Inputs: chosenNames dataset for identification parameters
-			function clearChosen(chosenName){
-				// Clear String property
-				propertiesList[chosenName.chosenStringName] = null;
-				// Clear chosen dropdown selectable values
-				$(chosenName.chosenID).children().remove();
-				// clear chosen dropdown selected values
-				$(chosenName.chosenID).val('').trigger("chosen:updated");
-				// Clear table and graph search criteria
-				if (chosenName.chosenTitle === '$model'){
-					updateDataTablesSearch(null);
-				}
-			}
-			
-			// Function to update the filter strings sent into custom query
-			// Strings should have format of similar to:
-			//		'(event.properties["App Name"] === "Friends" ||
-			//		event.properties["App Name"] === "Robots") '
-			// Inputs: chosenNames dataset for identification parameters
-			function updateFilterString(chosenName){
-				// pull array of selected items
-				var itemList = $(chosenName.chosenID).chosen().val();
-				if (itemList){
-					var outputString = '(';
-					// build the 'event.properties["App Name"] === ' part of the string
-					var leftSideEquivalencyTest = 'event.properties["' + chosenName.
-						chosenTitle + '"] === ';
-					// Due to test cases having numerical values, have created possibility
-					// but may become invalid if new options that are non-numerical and of
-					// length 1 come into play
-					// NOTE: isNaN function doesn't work when checking numbers in a string 
-					// so checking by length
-					
-					if ((itemList[0].length > 1) && itemList[0] !== "undefined"){
-						outputString += leftSideEquivalencyTest + '"' + itemList[0] + '"';
-					}
-					// Numeric entry option
-					else{
-						outputString += leftSideEquivalencyTest + itemList[0];
-					}
-					
-					// Add in the || other event.properties segments
-					for (var i = 1; i < itemList.length; i++){
-						// String entry
-						if ((itemList[i].length > 1) && itemList[i] !== "undefined"){
-							outputString += ' || ' + leftSideEquivalencyTest + '"' + itemList[i] + '"';
-						}
-						// Numeric entry
-						else{
-							outputString += ' || ' + leftSideEquivalencyTest + itemList[i];
-						}
-					}
-					outputString += ')';
-					// set propertiesList variable for use elsewhere
-					propertiesList[chosenName.chosenStringName] = outputString;
-				}
-				// nothing was selected therefore set to null
-				else {
-					propertiesList[chosenName.chosenStringName] = null;
-				}
-			}
-
-			// Function to get data for the dropdown menus based on existing criteria
-			// Inputs: chosenNames dataset for identification parameters
-			function getDropdownMenuData(chosenName){
-				var params = {
-					from_date: propertiesList.from,
-					to_date: propertiesList.to,
-					event: eventSelect.MPEventSelect('value')
-				};
-				var script = stringBuilderChosenOptions(chosenName.chosenTitle, 0);
-				MP.api.custom_query(script, params).done(function(results) {
-					updateChosen(chosenName, results[0]);
-				});		
-			}
-			
-			// Function to build the script for use in custom_query commands
-			// Inputs: propertySelector, the string variant of the field 
-			//		name to be groupedBy,
-			//		selector, a variable determining if it's retrieving menu 
-			//		data or usable data
-			// 		selector == 0, retrieve menu data
-			// 		selector == 1, retrieve table data
-			function stringBuilderChosenOptions(propertySelector, selector){
-				var startFunction = 'function main() { \
-					return Events({from_date: params.from_date,\
-						to_date: params.to_date,\
-						event_selectors: [{event: params.event}]})';
-				// filter by event
-				var eventFilter = '.filter(function(event) { return (event.name === params.event ) })';
-				// filter by properties (Platform, App Name, and $model)
-				var propertyFilters = '';
-				if (propertiesList.platformString){
-					propertyFilters += '.filter(function(event) { return (' + propertiesList.platformString +' ) })';
-				}
-				if (propertiesList.appNameString){
-					propertyFilters += '.filter(function(event) { return (' + propertiesList.appNameString +' ) })';
-				}
-				
-				if (propertiesList.deviceModelString){
-					propertyFilters += '.filter(function(event) { return (' + propertiesList.deviceModelString +' ) })';
-				}
-				var groupByString = '';
-				var reducer = '';
-				var map = '';
-				switch (selector) {
-					case 0:
-						groupByString = '.groupBy(["properties.'+ propertySelector +'"], mixpanel.reducer.count())';
-						// reducer function to parse data specifically for menu lists
-						reducer = 
-							'.reduce(function(previousData, object){\
-								var allData = [];\
-								var total = 0;\
-								for (var i = 0; i < previousData.length;i++){\
-									var elementPreviousData = previousData[i];\
-									for (var j = 0; j < elementPreviousData.length;j++){\
-										allData.push(elementPreviousData[j]);\
-									}\
-								}\
-								for (i=0; i<object.length; i++){\
-									var element = object[i].key["0"];\
-									if (element){\
-									  allData.push(element);\
-									}\
-									else{\
-									  allData.push("undefined");\
-									}\
-								}\
-								return allData;\
-							})'
-						break;
-					case 1:
-						groupByString = '.groupByUser(["properties.$model"],mixpanel.reducer.count())\
-							.groupBy(["key.1"], mixpanel.reducer.count())';
-						// reducer function to bring data into [device name, value] sub-arrays
-						reducer =
-							'.reduce(function(previousData, object){\
-								var allData = [];\
-								var total = 0;\
-								for (var i = 0; i < previousData.length;i++){\
-									var elementPreviousData = previousData[i];\
-									for (var j = 0; j < elementPreviousData.length;j++){\
-										allData.push(elementPreviousData[j]);\
-									}\
-								}\
-								for (i=0; i<object.length; i++){\
-									var element = [object[i].key["0"], object[i].value];\
-									allData.push(element);\
-								}\
-								return allData;\
-							})'
-						// map to restructure the data to [rank, device name, value, percentage]
-						map = 
-							'.map(function(event){\
-								function sortByValue(a, b) {\
-									if (a[1] === b[1]) {\
-										return 0;\
-									}\
-									else {\
-										return (a[1] < b[1]) ? 1 : -1;\
-									}\
-								}\
-								var allData = [];\
-								var total = 0;\
-								event.sort(sortByValue);\
-								for (var i = 0; i < event.length; i++){\
-									total += event[i][1];\
-								}\
-								for (i = 0; i < event.length; i++){\
-									var name = event[i][0];\
-									if (name === null){\
-										name = "undefined";\
-									}\
-									var element = [i+1, name, event[i][1], parseFloat(event[i][1] \
-									/ total * 100).toFixed(2)];\
-									allData.push(element);\
-								}\
-								return allData;\
-							})'
-						break;
-					default:
-						console.log("stringBuilderChosenOptions, incorrect selector value");
-				}
-				// Build the whole script and return
-				outputString = startFunction + eventFilter + propertyFilters + groupByString + reducer + map + '}';
-				return outputString;
-			}
-
+	
 			// Function to pull data and plot it
 			function runQuery(){
 				var eventName = eventSelect.MPEventSelect('value');
@@ -393,11 +94,9 @@
 						event: eventSelect.MPEventSelect('value')
 					};
 					// Build script
-					var script = stringBuilderChosenOptions('$model', 1);
+					var script = buildCustomQueryFunctionScript('$model', 1);
 					// Get device data
 					MP.api.custom_query(script, params).done(function(results) {
-//						console.log("runQuery", script, results);
-
 						// store data for use in dropdown and limit functions
 						lastDataPull = results[0];
 						// Calculate total users and build sorted device list
@@ -407,20 +106,7 @@
 					});
 				}
 			};
-			
-			// Function to convert Array data to a JSON object for MPCharts
-			// Input: Array of [Device Name, Number of Users] sub-arrays
-			function convertArrayToJSON(data){
-				outputData = {};
-				var element;
-				// Enter each data point in Key : Value pairs into Object
-				for (var i = 0; i < data.length; i++){
-					element = data[i];
-					outputData[element[0]] = element[1];
-				}
-				return outputData
-			}
-		  
+
 			// Function to set default variables (Event === 'App Started'), 
 			//		note time delay may need to be increased if it fails to 
 			//		load appropriately
@@ -430,487 +116,60 @@
 				}, 2000);
 			}
 			setDefaultEvent();
-			
-			// Function to reorganize the data to limit parameter constraints
-			// Inputs: data, an Array of sub-arrays (defined below),
-			//			limit, Integer value of maximum allowed devices,
-			//			setting, Integer value depending on structure of input
-			//			data
-			// setting === 0 means it's already in [Name, value] pairs
-			// setting === 1 means it's still in [Rank, Name, value, percentage]
-			//					sub-arrays
-			function reduceLength(data, limit, setting){
-				var newData = [];
-				// Make sure the data needs to be modified
-				if (data.length > limit){
-					var sum = 0;
-					// determine input data structure
-					if (setting === 0){
-						for (var i = 0; i < limit; i++){
-							// Consider using a splice here since the structure
-							// remains the same but for loop still needed for
-							// sum
-							var value = parseInt(data[i][1]);
-							newData.push([data[i][0],value]);
-							sum += value;
-						}
-					}
-					else {
-						for (var i = 0; i < limit; i++){
-							var value = parseInt(data[i][2]);
-							newData.push([data[i][1],value]);
-							sum += value;
-						}
-					}
-					// Create Other Devices entry
-					newData.push(["Other Devices", totalNumUsers - sum]);
-				}
-				return newData;
-			}
-			
-			// Function to sort a list with, smallest to largest
-			function sortByValue(a, b) {
-				if (a === b) {
-					return 0;
-				}
-				else {
-					return (a < b) ? -1 : 1;
-				}
-			}
-			
-			// Function to plot a graph using MPCharts
-			// Input: dataSet, array of [Rank, Device Name, Num Users, Percentage Users]
-			function plotGraph(dataSet){
-				// Verify there is data to plot
-				if (dataSet){
-					// determine plotting limit
-					var plotLimit = (propertiesList.limit <= graphDisplayUpperLimit) ?
-							propertiesList.limit : graphDisplayUpperLimit;
-					var plotData = [];
-					// selector for whether plotData has an Other Devices sub-array
-					var otherDevicesCategory = 0;
-					// Devices were selected therefore screen for them
-					if (propertiesList.deviceFilterNumbers){
-						otherDevicesCategory = 1;
-						var sum = 0;
-						// Go through each selected device and pull it from the overall list
-						// using its recorded index number and add to new list
-						for (var i = 0; i < propertiesList.deviceFilterNumbers.length; i++){
-							var index = propertiesList.deviceFilterNumbers[i]-1;
-							plotData.push([dataSet[index][1], dataSet[index][2]]);
-							sum += dataSet[index][2];
-						}
-						// The number of devices selected were greater than the limit
-						// Filter by limit
-						if (plotData.length > plotLimit){
-							plotData = reduceLength(plotData, plotLimit, 0);
-						}
-						// Limit is not violated, add Other Devices column here
-						else{
-							plotData.push(["Other Devices", totalNumUsers - sum]);
-						}
-					}
-					// Devices were not selected
-					else {
-						// Limit exceeded, filter by limit
-						if (dataSet.length > plotLimit){
-							otherDevicesCategory = 1;
-							plotData = reduceLength(dataSet, plotLimit, 1);
-						}
-						// Limit is not exceeded, copy relevant data to plotData
-						else {
-							for (var i = 0; i < dataSet.length;i++){
-								plotData.push([dataSet[i][1], dataSet[i][2]]);
-							}
-						}
-					}
-					// GRAPH SEGMENT
-					// Must remove the old graph then create a new one to accommodate
-					// changes to chart type
-					
-					// Delete the old table
-					if (eventGraph.length > 0) {
-						eventGraph.remove();
-					}
-					// Create a new table
-					eventGraph = $('<div id="#graph" />')
-					$(".mixpanel-platform-section").after(eventGraph)
-					
-					// Setup graph titles
-					var titleString = (plotData.length - otherDevicesCategory).toString() + ' of ' + deviceList.length + ' devices shown';
-					var subTitleString = 'Total users: ' + totalNumUsers;
-					var fontSettings = { "color": "#333333", "fontSize": "18px" };
-					var titleSettings = {
-									align : 'center',
-									floating : true,
-									text: titleString,
-									style: fontSettings
-								};
-					var subTitleSettings = {
-									align : 'center',
-									floating : true,
-									text: subTitleString,
-									style: fontSettings
-								}
-					// Select display type based on number of datapoints
-					if (plotData.length <= graphNumberLimit + 1){
-						eventGraph.MPChart({chartType: 'pie',
-							highchartsOptions: {
-								title: titleSettings,
-								subtitle: subTitleSettings
-							}
-						});
-					}
-					else {
-						eventGraph.MPChart({chartType: 'bar',
-							highchartsOptions: {
-								title: titleSettings,
-								subtitle: subTitleSettings
-							}
-						});
-					}
-					// Convert data back to acceptable form for MPChart
-					var graphData = convertArrayToJSON(plotData); 
-					eventGraph.MPChart('setData', graphData);
-				}
-				else{
-					console.log("Warning: plotGraph, no DATA!");
-				}
-				
-			}
-	
-			// DATATABLES IMPLEMENTATION
-			// create dummy table for destruction (required for dataTablesChart function)
-			var table = $('#instantlyDestroyedTable').DataTable(); 
-			
-			// Function to create dataTable using jQuery plug-in, dataTables
-			// Inputs: dataSet, an object of Device : value pairings
-			function plotChart(dataSet){
-				// Graph data
-				plotGraph(dataSet);
-				
-				// Generate dataTable Variables
-				var titleArray = [{title : "Rank"},
-					  {title : "Device Name"}, 
-					  {title : "Unique Users"},
-					  {title : "Usage (%)"}];
-
-				// Destroy the old table so it can be replaced with new data
-				table.destroy();
-				$('#dataTable').empty(); // empty in case the columns change
-				// Set up table footer
-				var columnString = '<tfoot><tr><th></th><th></th><th></th><th> \
-									</th></tr></tfoot>'; 
-				$("#dataTable").append(columnString);
-				
-				// Create a new table
-				table = $('#dataTable').DataTable( {
-					data: dataSet,
-					columns: titleArray,
-					"columnDefs": [
-						{ className: "dt-center", "targets": [ 0 ] },
-						{ className: "dt-center", "targets": [ 1 ] },
-						{ className: "dt-center", "targets": [ 2 ] },
-						{ className: "dt-center", "targets": [ 3 ] }
-					],
-					sDom : '<"top">tip', // hide search box
-					// Set display limit to dropdown menu value
-					"iDisplayLength": propertiesList.limit, 
-					// Hide dataTable display X items option
-					"bLengthChange": false, 
-					// Create Footer with sums/percentages
-					"footerCallback": function ( row, data, start, end, display ) {
-						var api = this.api(), data;
-
-						// Remove the formatting to get integer data for summation
-						var intVal = function ( i ) {
-							return typeof i === 'string' ?
-								i.replace(/[\$,]/g, '')*1 :
-								typeof i === 'number' ?
-									i : 0;
-							};
-
-						// Total number of users over all pages
-						total = totalNumUsers;
-
-						totalNumDevices = deviceList.length;
-
-						// Total number of users over this page
-						pageTotal = api
-							.column( 2, { page: 'current'} )
-							.data()
-							.reduce( function (a, b) {
-								return intVal(a) + intVal(b);
-							}, 0 );
-
-						// Update footer
-						// Set Number of Unique users on page
-						$( api.column( 2 ).footer() ).html(
-							'Unique Users: ' + pageTotal +' / ' + total
-						);
-						// Set Percentage of Unique users on page
-						pagePercentTotal = parseFloat((pageTotal/total)*100).toFixed(2);
-						$( api.column( 3 ).footer() ).html(
-							
-							'Usage (%): ' + pagePercentTotal +' / 100.00'
-						);
-
-						// Set number of devices overall
-						$( api.column( 0 ).footer() ).html(
-							'Total Number of Devices: ' + totalNumDevices
-						);
-					}
-				});
-			}
-
-			// Provided by MixPanel staff with minor modifications to account
-			// for Footer
-			// Export to CSV function, don't need to edit unless CSV breaks
-			function exportToCSV() {
-				var csv = $("#dataTable").table2CSV({delivery:'string'});
-				download(csv, "export.csv", "text/csv");
-			}
-
-			// Table2CSV
-			jQuery.fn.table2CSV = function(options) {
-				var options = jQuery.extend({
-					separator: ',',
-					header: [],
-					delivery: 'popup' // popup, value
-				},
-				options);
-
-				var csvData = [];
-				var headerArr = [];
-				var el = this;
-
-				//header
-				var numCols = options.header.length;
-				var tmpRow = []; // construct header avalible array
-//				var footerRow = [];
-
-				if (numCols > 0) {
-					for (var i = 0; i < numCols; i++) {
-						tmpRow[tmpRow.length] = formatData(options.header[i]);
-					}
-				} else {
-					$(el).filter(':visible').find('th').each(function() {
-						if ($(this).css('display') != 'none') tmpRow[tmpRow.length] = formatData($(this).html());
-					});
-				}
-				
-//				footerRow = tmpRow.splice(0,4); // Remove footer data and move to end
-				tmpRow.splice(0,4); // Remove footer data
-				row2CSV(tmpRow);
-				
-
-				// actual data
-				$(el).find('tr').each(function() {
-					var tmpRow = [];
-					$(this).filter(':visible').find('td').each(function() {
-						if ($(this).css('display') != 'none') tmpRow[tmpRow.length] = formatData($(this).html());
-					});
-					row2CSV(tmpRow);
-				});
-//				row2CSV(footerRow);// Insert Footer Data 
-				if (options.delivery == 'popup') {
-					var mydata = csvData.join('\n');
-					return popup(mydata);
-				} else {
-					var mydata = csvData.join('\n');
-					return mydata;
-				}
-				
-
-				function row2CSV(tmpRow) {
-					var tmp = tmpRow.join('') // to remove any blank rows
-					// alert(tmp);
-					if (tmpRow.length > 0 && tmp != '') {
-						var mystr = tmpRow.join(options.separator);
-						csvData[csvData.length] = mystr;
-					}
-				}
-				function formatData(input) {
-					// replace " with â€œ
-					var regexp = new RegExp(/["]/g);
-					var output = input.replace(regexp, "â€œ");
-					//HTML
-					var regexp = new RegExp(/\<[^\<]+\>/g);
-					var output = output.replace(regexp, "");
-					if (output == "") return '';
-					return '"' + output + '"';
-				}
-				function popup(data) {
-					var generator = window.open('', 'csv', 'height=400,width=600');
-					generator.document.write('<html><head><title>CSV</title>');
-					generator.document.write('</head><body >');
-					generator.document.write('<textArea cols=70 rows=15 wrap="off" >');
-					generator.document.write(data);
-					generator.document.write('</textArea>');
-					generator.document.write('</body></html>');
-					generator.document.close();
-					return true;
-				}
-			};
-
-			// Code to download the CSV
-			function download(strData, strFileName, strMimeType) {
-				var D = document,
-				a = D.createElement("a");
-				strMimeType= strMimeType || "application/octet-stream";
-
-
-				if (navigator.msSaveBlob) { // IE10
-					return navigator.msSaveBlob(new Blob([strData], {type: strMimeType}), strFileName);
-				} /* end if(navigator.msSaveBlob) */
-
-
-				if ('download' in a) { //html5 A[download]
-					a.href = "data:" + strMimeType + "," + encodeURIComponent(strData);
-					a.setAttribute("download", strFileName);
-					a.innerHTML = "downloading...";
-					D.body.appendChild(a);
-					setTimeout(function() {
-						a.click();
-						D.body.removeChild(a);
-					}, 66);
-					return true;
-				} /* end if('download' in a) */
-
-
-				//do iframe dataURL download (old ch+FF):
-				var f = D.createElement("iframe");
-				D.body.appendChild(f);
-				f.src = "data:" +  strMimeType   + "," + encodeURIComponent(strData);
-
-				setTimeout(function() {
-					D.body.removeChild(f);
-				}, 333);
-				return true;
-			} /* end download() */
-
-			// Function to update the datatables search results using the Chosen dropdown
-			// Note, this system requires a sorted list as it searches by index value due
-			// device names sometimes having spaces which DataTables interprets as a split
-			// to a new device.
-			// Inputs: data, an array of device names
-			function updateDataTablesSearch(data){
-				// Since the search function doesn't work for names with spaces, search by index value
-				if (data){
-					// Find index of each device
-					var indexValues = [];
-					console.log(deviceList)
-					for (var i = 0; i < data.length; i++){
-					console.log(data[i])
-						if (data[i] !== "null"){
-							// deviceList is assumed to be sorted based on # of users
-							indexValues.push(($.inArray(data[i], deviceList) + 1)); 
-						}
-						else{
-							indexValues.push(($.inArray("null", deviceList) + 1)); 
-						}
-					}
-					// Create search string, additions on left and right side are so
-					// DataTables uses the exact value otherwise it would show everything
-					// that had a partial match as well (i.e. 7 would return 7, 17, 27, 70, etc.)
-					var itemString = "^\\s*"+indexValues[0].toString()+"\\s*$" ;		
-					for (var i = 1; i < indexValues.length; i++){
-						itemString += '|' + "^\\s*"+indexValues[i].toString()+"\\s*$"  ;
-					}
-					// Order the list for use in other functions
-					indexValues.sort(sortByValue);
-					// Store index values
-					propertiesList.deviceFilterNumbers = indexValues;
-					// Search the table and draw the output
-					table.column(0).search(itemString, true, false, true).draw();	
-				}
-				// In event search criteria have been cleared, clear the table and
-				// the stored values
-				else{
-					table
-						.search( '' )
-						.columns().search( '' )
-						.draw();
-					propertiesList.deviceFilterNumbers = null;
-				}
-			}
-
-			// Function to parse and store a list of the sorted Device Names (sorted by number of users) and calculate the total number of users
-			// Input: data, array of [Rank, Device Name, Num Users, Percentage Users]
-			function parseBaseData(data){
-				deviceList = [];
-				totalNumUsers = 0;
-				if (data){
-					for (var i = 0; i < data.length;i++){
-						var deviceName = data[i][1];
-						deviceList.push(deviceName);
-						totalNumUsers += data[i][2];
-					}
-				}
-				else{
-					console.log("parseBaseData, no data provided");
-				}
-				
-			}
 
 			/*
 			ON CHANGE effects
 			*/
 			dropdownLimit.on('change', function(e, selection) { 
-				//propertiesList['limit'] = selection;
 				var selectedDeviceModels = $('.chosen-model').chosen().val()
 				console.log("Change Limit", selection);
 				customNumberDevicesSelect(selection);
 				updateDataTablesSearch(selectedDeviceModels);
-
-				// update data for model selection first
-				//runQuery(); // runQuery run from customNumberDevicesSelect
-
 			});
 			
 			eventSelect.on('change', function(e, eventName) {
 				console.log("Event change", eventName);
-				clearChosen(chosenNames[0]);
-				clearChosen(chosenNames[1]);
-				clearChosen(chosenNames[2]);
-				getDropdownMenuData(chosenNames[0]);
-				getDropdownMenuData(chosenNames[1]);
-				getDropdownMenuData(chosenNames[2]);
+				clearDropdownMenu(dropdownVariables['platform']);
+				clearDropdownMenu(dropdownVariables['appName']);
+				clearDropdownMenu(dropdownVariables['model']);
+				getDropdownMenuData(dropdownVariables['platform']);
+				getDropdownMenuData(dropdownVariables['appName']);
+				getDropdownMenuData(dropdownVariables['model']);
 				runQuery();
 			});
 			$( ".chosen-platform" ).change(function() {
 				var selectedPlatforms = $('.chosen-platform').chosen().val()
 				console.log("Change Platform", selectedPlatforms);
-				clearChosen(chosenNames[1]);
-				clearChosen(chosenNames[2]);
-				updateFilterString(chosenNames[0]);
-				getDropdownMenuData(chosenNames[1]);
-				getDropdownMenuData(chosenNames[2]);
+				clearDropdownMenu(dropdownVariables['appName']);
+				clearDropdownMenu(dropdownVariables['model']);
+				updateFilterString(dropdownVariables['platform']);
+				getDropdownMenuData(dropdownVariables['appName']);
+				getDropdownMenuData(dropdownVariables['model']);
 				runQuery();
 			});
 			$( ".chosen-appName" ).change(function() {
 				var selectedAppNames = $('.chosen-appName').chosen().val()
 				console.log("Change appName", selectedAppNames);;
-				clearChosen(chosenNames[2]);
-				updateFilterString(chosenNames[1]);
-				getDropdownMenuData(chosenNames[2]);
+				clearDropdownMenu(dropdownVariables['model']);
+				updateFilterString(dropdownVariables['appName']);
+				getDropdownMenuData(dropdownVariables['model']);
 				runQuery();
 			});
 			$( ".chosen-model" ).change(function() {
 				var selectedDeviceModels = $('.chosen-model').chosen().val()
 				console.log("Change model", selectedDeviceModels);
-				updateFilterString(chosenNames[2]);
+				updateFilterString(dropdownVariables['model']);
 				updateDataTablesSearch(selectedDeviceModels);
 				plotGraph(lastDataPull);
 			});
 			dropdownDates.on('change', function(e, selection){
 				updateTime(selection);
-				clearChosen(chosenNames[0]);
-				clearChosen(chosenNames[1]);
-				clearChosen(chosenNames[2]);
-				getDropdownMenuData(chosenNames[0]);
-				getDropdownMenuData(chosenNames[1]);
-				getDropdownMenuData(chosenNames[2]);
+				clearDropdownMenu(dropdownVariables['platform']);
+				clearDropdownMenu(dropdownVariables['appName']);
+				clearDropdownMenu(dropdownVariables['model']);
+				getDropdownMenuData(dropdownVariables['platform']);
+				getDropdownMenuData(dropdownVariables['appName']);
+				getDropdownMenuData(dropdownVariables['model']);
 				
 				runQuery();
 			});
@@ -926,12 +185,12 @@
 						// prevent users from selecting dates past the 'to' date
 						$( "#to" ).datepicker( "option", "minDate", selectedDate );
 						propertiesList["from"] = selectedDate;
-						clearChosen(chosenNames[0]);
-						clearChosen(chosenNames[1]);
-						clearChosen(chosenNames[2]);
-						getDropdownMenuData(chosenNames[0]);
-						getDropdownMenuData(chosenNames[1]);
-						getDropdownMenuData(chosenNames[2]);
+						clearDropdownMenu(dropdownVariables['platform']);
+						clearDropdownMenu(dropdownVariables['appName']);
+						clearDropdownMenu(dropdownVariables['model']);
+						getDropdownMenuData(dropdownVariables['platform']);
+						getDropdownMenuData(dropdownVariables['appName']);
+						getDropdownMenuData(dropdownVariables['model']);
 						runQuery();
 					}
 				});
@@ -946,12 +205,12 @@
 						// prevent users from selecting dates before the 'from' date
 						$( "#from" ).datepicker( "option", "maxDate", selectedDate );
 						propertiesList["to"] = selectedDate;
-						clearChosen(chosenNames[0]);
-						clearChosen(chosenNames[1]);
-						clearChosen(chosenNames[2]);
-						getDropdownMenuData(chosenNames[0]);
-						getDropdownMenuData(chosenNames[1]);
-						getDropdownMenuData(chosenNames[2]);
+						clearDropdownMenu(dropdownVariables['platform']);
+						clearDropdownMenu(dropdownVariables['appName']);
+						clearDropdownMenu(dropdownVariables['model']);
+						getDropdownMenuData(dropdownVariables['platform']);
+						getDropdownMenuData(dropdownVariables['appName']);
+						getDropdownMenuData(dropdownVariables['model']);
 						runQuery();
 					}
 				});
