@@ -11,31 +11,12 @@ function updateFilterString(dropdownMenu){
 		// build the 'event.properties["App Name"] === ' part of the string
 		var leftSideEquivalencyTest = 'event.properties["' + dropdownMenu.
 			title + '"] === ';
-		// Due to test cases having numerical values, have created possibility
-		// but may become invalid if new options that are non-numerical and of
-		// length 1 come into play
-		// NOTE: isNaN function doesn't work when checking numbers in a string 
-		// so checking by length
-		
-		if ((itemList[0].length > 1) && itemList[0] !== "undefined"){
-			outputString += leftSideEquivalencyTest + '"' + itemList[0] + '"';
-		}
-		// Numeric entry option
-		else{
-			outputString += leftSideEquivalencyTest + itemList[0];
-		}
-		
-		// Add in the || other event.properties segments
-		for (var i = 1; i < itemList.length; i++){
-			// String entry
-			if ((itemList[i].length > 1) && itemList[i] !== "undefined"){
-				outputString += ' || ' + leftSideEquivalencyTest + '"' + itemList[i] + '"';
-			}
-			// Numeric entry
-			else{
-				outputString += ' || ' + leftSideEquivalencyTest + itemList[i];
-			}
-		}
+		var selectedItemStrings = [];
+		for (var i = 0; i < itemList.length; i++){
+			var newEntry = stringCheckForItem(itemList[i], leftSideEquivalencyTest);
+			selectedItemStrings.push(newEntry);
+		}		
+		outputString += selectedItemStrings.join(' || ');
 		outputString += ')';
 		// set propertiesList variable for use elsewhere
 		propertiesList[dropdownMenu.stringName] = outputString;
@@ -46,6 +27,29 @@ function updateFilterString(dropdownMenu){
 	}
 }
 
+// Function to check an item input against select properties. If it's numerical
+// 		or undefined, put into string without quotations else add quotations
+// Inputs: selectedItem, String of selected item from dropdown menu
+//		leftSideEquivalencyTest, String similar to:
+//			'event.properties["App Name"] === '
+// Output: 'event.properties["App Name"] === "Robots"'
+function stringCheckForItem(selectedItem, leftSideEquivalencyTest){
+	var outputString = '';
+	// Due to test cases having numerical values, have created possibility
+	// but may become invalid if new options that are non-numerical and of
+	// length 1 come into play
+	// NOTE: isNaN function doesn't work when checking numbers in a string 
+	// so checking by length
+	if (selectedItem.length > 1 && selectedItem !== "undefined"){
+		outputString = leftSideEquivalencyTest + '"' + selectedItem + '"';
+	}
+	// A numerical input or undefined value, do not add quotations
+	else{
+		outputString = leftSideEquivalencyTest + selectedItem;
+	}
+	return outputString;
+}
+
 // Function to build the script for use in custom_query commands
 // Inputs: propertySelector, the string variant of the field 
 //		name to be groupedBy,
@@ -54,10 +58,11 @@ function updateFilterString(dropdownMenu){
 // 		selector == 0, retrieve menu data
 // 		selector == 1, retrieve table data
 function buildCustomQueryFunctionScript(propertySelector, selector){
-	var startFunction = 'function main() { \
-		return Events({from_date: params.from_date,\
-			to_date: params.to_date,\
-			event_selectors: [{event: params.event}]})';
+	var startFunction = '\
+		function main() { \
+			return Events({from_date: params.from_date,\
+				to_date: params.to_date,\
+				event_selectors: [{event: params.event}]})';
 	// filter by event
 	var eventFilter = '.filter(function(event) { return (event.name === params.event ) })';
 	// filter by properties (Platform, App Name, and $model)
@@ -76,6 +81,7 @@ function buildCustomQueryFunctionScript(propertySelector, selector){
 	var reducer = '';
 	var map = '';
 	switch (selector) {
+		// Get data for dropdown menu options, returned as array of names
 		case 0:
 			groupByString = '.groupBy(["properties.'+ propertySelector +'"], mixpanel.reducer.count())';
 			// reducer function to parse data specifically for menu lists
@@ -101,6 +107,8 @@ function buildCustomQueryFunctionScript(propertySelector, selector){
 					return allData;\
 				})'
 			break;
+		// Get data for actual use, returned in form of 
+		//		[Rank, Device Name, # Users, % Users]
 		case 1:
 			groupByString = '.groupByUser(["properties.$model"],mixpanel.reducer.count())\
 				.groupBy(["key.1"], mixpanel.reducer.count())';

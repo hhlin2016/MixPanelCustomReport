@@ -160,6 +160,7 @@ function getDropdownMenuData(dropdownMenuVariables){
 // Inputs: 	Integer, period indicating months to go back (-1 denotes
 // 			custom time period)
 function updateTime(period) {
+	// Custom Time period selected, show input box
 	if (period === -1){
 		// Show datepicker and set time data
 		$("#from").datepicker('setDate', propertiesList["from"]);
@@ -167,7 +168,7 @@ function updateTime(period) {
 		$(".timeSelectGroup").show();
 	}
 	else {
-		// Hide datepicker and set time data
+		// Hide datepicker and set time data based on selection
 		var from_date = moment().subtract(parseInt(period), 
 						'months').format("YYYY-MM-DD");
 		var to_date = moment().format("YYYY-MM-DD");
@@ -177,13 +178,16 @@ function updateTime(period) {
 	}
 }
 
+// Function to update the selected number of devices to show from the 
+// dropdown menu. Also shows/hides element relating to the custom input 
+// textbox and button if the user selected Select Custom Value
 function customNumberDevicesSelect(numDevices) {
+	// Custom number of devices to show selected, show box and button
 	if (numDevices === -1){
-		// Show datepicker and set time data
 		$(".tbxNumSelect").show();
 	}
+	// Hide input box and button, adjust chart/graph according to selection
 	else {
-		// Hide datepicker and set time data
 		propertiesList["limit"] = numDevices;
 		$(".tbxNumSelect").hide();
 		// Use last pulled server data to recompute list

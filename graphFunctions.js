@@ -83,17 +83,19 @@ function plotGraph(dataSet){
 				propertiesList.limit : graphDisplayUpperLimit;
 		var plotData = [];
 		// selector for whether plotData has an Other Devices sub-array
-		var otherDevicesCategory = 1;
+		var otherDevicesCategory = 0;
 		// Devices were selected therefore screen for them
 		if (propertiesList.deviceFilterNumbers){
 			plotData = plotGraphSelectedDevices(dataSet, plotLimit)
 		}
 		// Devices were not selected
 		else {
-			if (dataSet.length < plotLimit){
-				otherDevicesCategory = 0;
-			}
 			plotData = plotGraphAllDevices(dataSet, plotLimit);
+		}
+		// Determine if Other Devices was added to the array. If so,
+		//	set otherDevicesCategory to 1 so it's discounted later
+		if (plotData[plotData.length-1][0] === "Other Devices"){
+				var otherDevicesCategory = 1;
 		}
 		// GRAPH SEGMENT
 		// Must remove the old graph then create a new one to accommodate
@@ -109,7 +111,6 @@ function plotGraph(dataSet){
 		// Setup graph titles
 		var titleString = (plotData.length - otherDevicesCategory).toString() + ' of ' + deviceList.length + ' devices shown';
 		var subTitleString = 'Total users: ' + totalNumUsers;
-
 		var fontSettings = { "color": "#333333", "fontSize": "18px" };
 		var titleSettings = {
 						align : 'center',
@@ -148,7 +149,6 @@ function plotGraph(dataSet){
 	else{
 		console.log("Warning: plotGraph, no DATA!");
 	}
-	
 }
 
 // DATATABLES IMPLEMENTATION
