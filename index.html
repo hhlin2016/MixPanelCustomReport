@@ -222,7 +222,14 @@
 					// Due to test cases having numerical values, have created possibility
 					// but may become invalid if new options that are non-numerical and of
 					// length 1 come into play
-					if (itemList[0].length > 1){
+					// NOTE: isNaN function doesn't work when checking numbers in a string 
+					// so checking by length
+//TODO: FIX THIS SO WE DON"T NEED AN IF"
+					if (itemList[0] == "null"){
+						alert("updateStringFilter, null found")
+						itemList[0] = "undefined";
+					}
+					if ((itemList[0].length > 1) && itemList[0] !== "undefined"){
 						outputString += leftSideEquivalencyTest + '"' + itemList[0] + '"';
 					}
 					// Numeric entry option
@@ -232,8 +239,12 @@
 					
 					// Add in the || other event.properties segments
 					for (var i = 1; i < itemList.length; i++){
+						if (itemList[i] == "null"){
+							alert("updateStringFilter, null found in index:", i)
+							itemList[i] = "undefined";
+						}
 						// String entry
-						if (itemList[i].length > 1){
+						if ((itemList[i].length > 1) && itemList[i] !== "undefined"){
 							outputString += ' || ' + leftSideEquivalencyTest + '"' + itemList[i] + '"';
 						}
 						// Numeric entry
@@ -261,6 +272,7 @@
 				};
 				var script = stringBuilderChosenOptions(chosenName.chosenTitle, 0);
 				MP.api.custom_query(script, params).done(function(results) {
+					console.log("getDropdownMenuData", script, results);
 					updateChosen(chosenName, results[0]);
 				});		
 			}
@@ -384,6 +396,7 @@
 					var script = stringBuilderChosenOptions('$model', 1);
 					// Get device data
 					MP.api.custom_query(script, params).done(function(results) {
+//						console.log("runQuery", script, results);
 						// store data for use in dropdown and limit functions
 						lastDataPull = results[0];
 						// Calculate total users and build sorted device list
@@ -481,6 +494,8 @@
 						var sum = 0;
 						// Go through each selected device and pull it from the overall list
 						// using its recorded index number and add to new list
+						var consoleText = ' **********NEW VARIABLE************* ';
+						console.log("plotGraph Issues", dataSet, consoleText, propertiesList.deviceFilterNumbers)
 						for (var i = 0; i < propertiesList.deviceFilterNumbers.length; i++){
 							var index = propertiesList.deviceFilterNumbers[i]-1;
 							plotData.push([dataSet[index][1], dataSet[index][2]]);
@@ -786,12 +801,15 @@
 					// Find index of each device
 					var indexValues = [];
 					for (var i = 0; i < data.length; i++){
-						if (data[i]){
+					
+						if (data[i] !== "null"){
 							// deviceList is assumed to be sorted based on # of users
 							indexValues.push(($.inArray(data[i], deviceList) + 1)); 
+							console.log("updateDataTablesSearch, IF", data[i], typeof(data[i]));
 						}
 						else{
-							indexValues.push(($.inArray('null', deviceList) + 1)); 
+							console.log("updateDataTablesSearch, ELSE", data[i]);
+							indexValues.push(($.inArray("null", deviceList) + 1)); 
 						}
 					}
 					// Create search string, additions on left and right side are so
