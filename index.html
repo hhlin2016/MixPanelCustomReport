@@ -139,7 +139,7 @@
 					propertiesList["limit"] = numDevices;
 					$(".tbxNumSelect").hide();
 					// Use last pulled server data to recompute list
-					plotData(lastDataPull);
+					plotChart(lastDataPull);
 				}
 			}
 		  
@@ -224,11 +224,7 @@
 					// length 1 come into play
 					// NOTE: isNaN function doesn't work when checking numbers in a string 
 					// so checking by length
-//TODO: FIX THIS SO WE DON"T NEED AN IF"
-					if (itemList[0] == "null"){
-						alert("updateStringFilter, null found")
-						itemList[0] = "undefined";
-					}
+					
 					if ((itemList[0].length > 1) && itemList[0] !== "undefined"){
 						outputString += leftSideEquivalencyTest + '"' + itemList[0] + '"';
 					}
@@ -239,10 +235,6 @@
 					
 					// Add in the || other event.properties segments
 					for (var i = 1; i < itemList.length; i++){
-						if (itemList[i] == "null"){
-							alert("updateStringFilter, null found in index:", i)
-							itemList[i] = "undefined";
-						}
 						// String entry
 						if ((itemList[i].length > 1) && itemList[i] !== "undefined"){
 							outputString += ' || ' + leftSideEquivalencyTest + '"' + itemList[i] + '"';
@@ -272,7 +264,6 @@
 				};
 				var script = stringBuilderChosenOptions(chosenName.chosenTitle, 0);
 				MP.api.custom_query(script, params).done(function(results) {
-					console.log("getDropdownMenuData", script, results);
 					updateChosen(chosenName, results[0]);
 				});		
 			}
@@ -322,7 +313,12 @@
 								}\
 								for (i=0; i<object.length; i++){\
 									var element = object[i].key["0"];\
-									allData.push(element);\
+									if (element){\
+									  allData.push(element);\
+									}\
+									else{\
+									  allData.push("undefined");\
+									}\
 								}\
 								return allData;\
 							})'
@@ -365,7 +361,11 @@
 									total += event[i][1];\
 								}\
 								for (i = 0; i < event.length; i++){\
-									var element = [i+1, event[i][0], event[i][1], parseFloat(event[i][1] \
+									var name = event[i][0];\
+									if (name === null){\
+										name = "undefined";\
+									}\
+									var element = [i+1, name, event[i][1], parseFloat(event[i][1] \
 									/ total * 100).toFixed(2)];\
 									allData.push(element);\
 								}\
@@ -397,12 +397,13 @@
 					// Get device data
 					MP.api.custom_query(script, params).done(function(results) {
 //						console.log("runQuery", script, results);
+
 						// store data for use in dropdown and limit functions
 						lastDataPull = results[0];
 						// Calculate total users and build sorted device list
 						parseBaseData(results[0]);
 						// Plot data
-						plotData(results[0]);
+						plotChart(results[0]);
 					});
 				}
 			};
@@ -494,8 +495,6 @@
 						var sum = 0;
 						// Go through each selected device and pull it from the overall list
 						// using its recorded index number and add to new list
-						var consoleText = ' **********NEW VARIABLE************* ';
-						console.log("plotGraph Issues", dataSet, consoleText, propertiesList.deviceFilterNumbers)
 						for (var i = 0; i < propertiesList.deviceFilterNumbers.length; i++){
 							var index = propertiesList.deviceFilterNumbers[i]-1;
 							plotData.push([dataSet[index][1], dataSet[index][2]]);
@@ -586,7 +585,7 @@
 			
 			// Function to create dataTable using jQuery plug-in, dataTables
 			// Inputs: dataSet, an object of Device : value pairings
-			function plotData(dataSet){
+			function plotChart(dataSet){
 				// Graph data
 				plotGraph(dataSet);
 				
@@ -800,15 +799,14 @@
 				if (data){
 					// Find index of each device
 					var indexValues = [];
+					console.log(deviceList)
 					for (var i = 0; i < data.length; i++){
-					
+					console.log(data[i])
 						if (data[i] !== "null"){
 							// deviceList is assumed to be sorted based on # of users
 							indexValues.push(($.inArray(data[i], deviceList) + 1)); 
-							console.log("updateDataTablesSearch, IF", data[i], typeof(data[i]));
 						}
 						else{
-							console.log("updateDataTablesSearch, ELSE", data[i]);
 							indexValues.push(($.inArray("null", deviceList) + 1)); 
 						}
 					}
@@ -845,10 +843,6 @@
 				if (data){
 					for (var i = 0; i < data.length;i++){
 						var deviceName = data[i][1];
-						// Compensate for 'null' entry (shows up in test data)
-						if (!deviceName){
-							deviceName = "null";
-						}
 						deviceList.push(deviceName);
 						totalNumUsers += data[i][2];
 					}
@@ -866,8 +860,6 @@
 				//propertiesList['limit'] = selection;
 				var selectedDeviceModels = $('.chosen-model').chosen().val()
 				console.log("Change Limit", selection);
-				
-				
 				customNumberDevicesSelect(selection);
 				updateDataTablesSearch(selectedDeviceModels);
 
@@ -968,7 +960,7 @@
 			$("#btnNumDevicesSubmit").click(function () {	
 				var textboxValue = tbxNumResultsSelect.value
 				propertiesList['limit'] = textboxValue;
-				plotData(lastDataPull);		
+				plotChart(lastDataPull);		
 			});
 		</script>
 	</body>
