@@ -35,7 +35,9 @@
 			<div id="labelSelectAppNames" class="mixpanel-platform-label" style=
 				"width: 258px; padding: 10 px">Select Application(s)</div>
 			<select data-placeholder="Select App(s), leave empty for all" class=
-				"chosen-appName" multiple="true" style="width: calc(100% - 300px); float:right" ></select>
+				"chosen-appName" multiple="true" style="width: calc(100% - 300px); float:right">
+				</select>
+				
 			<!-- Select Device Models -->
 			<div style="clear: both;"></div>
 			<div id="labelSelectDeviceModels" class="mixpanel-platform-label" 
@@ -44,6 +46,7 @@
 				"chosen-model" multiple="true" style="width: calc(100% - 
 				300px); float:right" ></select>
 			<div style="clear: both;"></div>
+			
 			<!-- Select Number of Devices to be Shown -->
 			<div id="labelNumDevices" class="mixpanel-platform-label" style="width: 
 				258px; padding: 10 px">Show Number of Devices</div>
@@ -55,6 +58,7 @@
 				Model(s)"></input></div>
 			<button style= "display: none; float:left; padding: 5px;" class
 				= "tbxNumSelect" id="btnNumDevicesSubmit">Submit</button> 
+			
 			<!-- Select Dates -->
 			<div style="clear: both;"></div>
 			<div id="labelSelectDates" class="mixpanel-platform-label" style=
@@ -73,24 +77,27 @@
 				"End date:">
 			<div style="clear: both;"></div>
 		</div>
+		
 		<!-- Graph -->
 		<div id="graph"></div>
 		<div style="clear: both;"></div><br>
+		
 		<!-- Table -->
 		<table id = "dataTable"></table>
+		
 		<!-- DOWNLOAD BUTTON -->
 		<div style="clear: both;"></div><br>
 		<button onclick="exportToCSV()" style="float: right;">Download CSV</button>
+		
 		<script>			
-			initialSettings();				
+			initializeChosenInterface();				
 			initializeDropdownMenus();
+			
 			// Function to pull data and plot it
 			// Called in Response to User Clicking On: dropdownDates, datePicker, 
 			//		appName dropdown, eventSelect, Platform dropdown
 			function runQuery(){
 				var eventName = eventSelect.MPEventSelect('value');
-				var initialParams = {from_date : propertiesList["from"], 
-					to_date : propertiesList["to"]};
 				if (eventName) {
 					// Parameters for custom query
 					var params = {
@@ -100,6 +107,7 @@
 					};
 					// Build script
 					var script = buildCustomQueryFunctionScript('$model', 1);
+//					console.log("runQuery", script, params);
 					// Get device data
 					MP.api.custom_query(script, params).done(function(results) {
 						// store data for use in dropdown and limit functions
@@ -107,10 +115,60 @@
 						// Calculate total users and build sorted device list
 						parseBaseData(results[0]);
 						// Plot data
-						plotChart(results[0]);
+						createDataTable(results[0]);
 					});
+					testQuery();
 				}
 			};
+// TODO: TESTING ONLY, REMOVE
+function testQuery(){
+var eventName = eventSelect.MPEventSelect('value');
+if (eventName) {
+	// Parameters for custom query
+	var params = {
+		from_date: "2015-10-01",
+		to_date: "2016-04-11",
+		event: eventSelect.MPEventSelect('value')
+	};
+	// Build script
+	var script = 'function main() {\
+        return Events({\
+          from_date: params.from_date,\
+          to_date: params.to_date,\
+          event_selectors: [{event: params.event}]\
+        })\
+        .filter(function(event) { return (event.name === params.event ) })\
+        .groupByUser(["properties.App Name"],mixpanel.reducer.count())\
+        .groupBy(["key.1"],mixpanel.reducer.count())\
+       .reduce(function(previousData, object){\
+					var allData = [];\
+					var total = 0;\
+					for (var i = 0; i < previousData.length;i++){\
+						var elementPreviousData = previousData[i];\
+						for (var j = 0; j < elementPreviousData.length;j++){\
+							allData.push(elementPreviousData[j]);\
+						}\
+					}\
+					for (i=0; i<object.length; i++){\
+						var element = object[i].value.toString() + "    " +object[i].key["0"] ;\
+						if (element){\
+						  allData.push(element);\
+						}\
+						else{\
+						  allData.push("undefined");\
+						}\
+					}\
+					return allData;\
+				})\
+}';
+//	console.log("testQuery", script, params);
+	// Get device data
+	MP.api.custom_query(script, params).done(function(results) {
+		console.log("testQuery results", results)
+	});
+}
+}
+// END TESTING
 
 			// Function to set default variables (Event === 'App Started'), 
 			//		note time delay may need to be increased if it fails to 
@@ -129,7 +187,7 @@
 				var selectedDeviceModels = $('.chosen-model').chosen().val()
 				console.log("Change Limit", selection);
 				customNumberDevicesSelect(selection);
-				updateDataTablesSearch(selectedDeviceModels);
+				updateDataTablesSearchResults(selectedDeviceModels);
 			});
 			
 			eventSelect.on('change', function(e, eventName) {
@@ -137,9 +195,9 @@
 				clearDropdownMenu(dropdownVariables['platform']);
 				clearDropdownMenu(dropdownVariables['appName']);
 				clearDropdownMenu(dropdownVariables['model']);
-				getDropdownMenuData(dropdownVariables['platform']);
-				getDropdownMenuData(dropdownVariables['appName']);
-				getDropdownMenuData(dropdownVariables['model']);
+				updateDropdownMenuData(dropdownVariables['platform']);
+				updateDropdownMenuData(dropdownVariables['appName']);
+				updateDropdownMenuData(dropdownVariables['model']);
 				runQuery();
 			});
 			$( ".chosen-platform" ).change(function() {
@@ -148,8 +206,8 @@
 				clearDropdownMenu(dropdownVariables['appName']);
 				clearDropdownMenu(dropdownVariables['model']);
 				updateFilterString(dropdownVariables['platform']);
-				getDropdownMenuData(dropdownVariables['appName']);
-				getDropdownMenuData(dropdownVariables['model']);
+				updateDropdownMenuData(dropdownVariables['appName']);
+				updateDropdownMenuData(dropdownVariables['model']);
 				runQuery();
 			});
 			$( ".chosen-appName" ).change(function() {
@@ -157,14 +215,14 @@
 				console.log("Change appName", selectedAppNames);;
 				clearDropdownMenu(dropdownVariables['model']);
 				updateFilterString(dropdownVariables['appName']);
-				getDropdownMenuData(dropdownVariables['model']);
+				updateDropdownMenuData(dropdownVariables['model']);
 				runQuery();
 			});
 			$( ".chosen-model" ).change(function() {
 				var selectedDeviceModels = $('.chosen-model').chosen().val()
 				console.log("Change model", selectedDeviceModels);
 				updateFilterString(dropdownVariables['model']);
-				updateDataTablesSearch(selectedDeviceModels);
+				updateDataTablesSearchResults(selectedDeviceModels);
 				plotGraph(lastDataPull);
 			});
 			dropdownDates.on('change', function(e, selection){
@@ -172,9 +230,9 @@
 				clearDropdownMenu(dropdownVariables['platform']);
 				clearDropdownMenu(dropdownVariables['appName']);
 				clearDropdownMenu(dropdownVariables['model']);
-				getDropdownMenuData(dropdownVariables['platform']);
-				getDropdownMenuData(dropdownVariables['appName']);
-				getDropdownMenuData(dropdownVariables['model']);
+				updateDropdownMenuData(dropdownVariables['platform']);
+				updateDropdownMenuData(dropdownVariables['appName']);
+				updateDropdownMenuData(dropdownVariables['model']);
 				
 				runQuery();
 			});
@@ -193,9 +251,9 @@
 						clearDropdownMenu(dropdownVariables['platform']);
 						clearDropdownMenu(dropdownVariables['appName']);
 						clearDropdownMenu(dropdownVariables['model']);
-						getDropdownMenuData(dropdownVariables['platform']);
-						getDropdownMenuData(dropdownVariables['appName']);
-						getDropdownMenuData(dropdownVariables['model']);
+						updateDropdownMenuData(dropdownVariables['platform']);
+						updateDropdownMenuData(dropdownVariables['appName']);
+						updateDropdownMenuData(dropdownVariables['model']);
 						runQuery();
 					}
 				});
@@ -213,9 +271,9 @@
 						clearDropdownMenu(dropdownVariables['platform']);
 						clearDropdownMenu(dropdownVariables['appName']);
 						clearDropdownMenu(dropdownVariables['model']);
-						getDropdownMenuData(dropdownVariables['platform']);
-						getDropdownMenuData(dropdownVariables['appName']);
-						getDropdownMenuData(dropdownVariables['model']);
+						updateDropdownMenuData(dropdownVariables['platform']);
+						updateDropdownMenuData(dropdownVariables['appName']);
+						updateDropdownMenuData(dropdownVariables['model']);
 						runQuery();
 					}
 				});
@@ -224,7 +282,7 @@
 			$("#btnNumDevicesSubmit").click(function () {	
 				var textboxValue = tbxNumResultsSelect.value
 				propertiesList['limit'] = textboxValue;
-				plotChart(lastDataPull);		
+				createDataTable(lastDataPull);		
 			});
 		</script>
 	</body>

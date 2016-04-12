@@ -47,7 +47,9 @@ jQuery.fn.table2CSV = function(options) {
 		});
 		row2CSV(tmpRow);
 	});
+	
 	row2CSV(footerRow);// Insert Footer Data 
+
 	if (options.delivery == 'popup') {
 		var mydata = csvData.join('\n');
 		return popup(mydata);
@@ -55,7 +57,6 @@ jQuery.fn.table2CSV = function(options) {
 		var mydata = csvData.join('\n');
 		return mydata;
 	}
-	
 
 	function row2CSV(tmpRow) {
 		var tmp = tmpRow.join('') // to remove any blank rows
@@ -65,6 +66,7 @@ jQuery.fn.table2CSV = function(options) {
 			csvData[csvData.length] = mystr;
 		}
 	}
+	
 	function formatData(input) {
 		// replace " with â€œ
 		var regexp = new RegExp(/["]/g);
@@ -75,6 +77,7 @@ jQuery.fn.table2CSV = function(options) {
 		if (output == "") return '';
 		return '"' + output + '"';
 	}
+	
 	function popup(data) {
 		var generator = window.open('', 'csv', 'height=400,width=600');
 		generator.document.write('<html><head><title>CSV</title>');
@@ -93,12 +96,9 @@ function download(strData, strFileName, strMimeType) {
 	var D = document,
 	a = D.createElement("a");
 	strMimeType= strMimeType || "application/octet-stream";
-
-
 	if (navigator.msSaveBlob) { // IE10
 		return navigator.msSaveBlob(new Blob([strData], {type: strMimeType}), strFileName);
 	}  // end if(navigator.msSaveBlob)
-
 
 	if ('download' in a) { //html5 A[download]
 		a.href = "data:" + strMimeType + "," + encodeURIComponent(strData);

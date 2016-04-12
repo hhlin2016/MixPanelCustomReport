@@ -53,7 +53,7 @@ var totalNumUsers;
 var eventSelect;
 var eventGraph = $('#graph');
 
-function initialSettings(){
+function initializeChosenInterface(){
 				// Initial variables
 	eventSelect = $('#eventSelect').MPEventSelect();
 
@@ -70,7 +70,7 @@ function initialSettings(){
 		initializeDropdownMenus()
 		updateDropdownMenu(dropdownMenuVariables, data)
 		clearDropdownMenu(dropdownMenuVariables)
-		getDropdownMenuData(dropdownMenuVariables)
+		updateDropdownMenuData(dropdownMenuVariables)
 */
 
 //Dropdown Limit Options
@@ -142,7 +142,7 @@ function clearDropdownMenu(dropdownMenuVariables){
 	$(dropdownMenuVariables.ID).val('').trigger("chosen:updated");
 	// Clear table and graph search criteria
 	if (dropdownMenuVariables.title === '$model'){
-		updateDataTablesSearch(null);
+		updateDataTablesSearchResults(null);
 	}
 }
 
@@ -150,7 +150,7 @@ function clearDropdownMenu(dropdownMenuVariables){
 // Called in Response to User Clicking On: dropdownDates, datePicker, 
 //		appName dropdown, eventSelect, Platform dropdown
 // Inputs: dropdownVariables dataset for identification parameters
-function getDropdownMenuData(dropdownMenuVariables){
+function updateDropdownMenuData(dropdownMenuVariables){
 	var params = {
 		from_date: propertiesList.from,
 		to_date: propertiesList.to,
@@ -207,7 +207,7 @@ function customNumberDevicesSelect(numDevices) {
 		propertiesList["limit"] = numDevices;
 		$(".tbxNumSelect").hide();
 		// Use last pulled server data to recompute list
-		plotChart(lastDataPull);
+		createDataTable(lastDataPull);
 	}
 }
 

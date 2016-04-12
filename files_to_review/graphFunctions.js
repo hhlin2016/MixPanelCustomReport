@@ -1,6 +1,8 @@
 // Function to reorganize the data to limit parameter constraints
 // Inputs: data, an Array of sub-arrays (defined below),
-//			limit, Integer value of maximum allowed devices,
+//			where setting === 0, data is in [Name, value] format,
+//			where setting === 1, data is in [Rank, Name, value, percentage] 
+//			format. limit, Integer value of maximum allowed devices,
 //			setting, Integer value depending on structure of input
 //			data
 function reduceLength(data, limit, setting){
@@ -34,7 +36,6 @@ function reduceLength(data, limit, setting){
 // Input: dataSet, array of [Rank, Device Name, Num Users, Percentage Users],
 //			plotLimit, integer value denoting how many items can be displayed
 function plotGraphSelectedDevices(dataSet, plotLimit){
-	console.log(dataSet, propertiesList.deviceFilterNumbers)
 	plotData = [];
 	var sum = 0;
 	// Go through each selected device and pull it from the overall list
@@ -115,19 +116,19 @@ function plotGraph(dataSet){
 		var subTitleString = 'Total users: ' + totalNumUsers;
 		var fontSettings = { "color": "#333333", "fontSize": "18px" };
 		var titleSettings = {
-						align : 'center',
-						floating : true,
-						text: titleString,
-						style: fontSettings
-					};
+				align : 'center',
+				floating : true,
+				text: titleString,
+				style: fontSettings
+			};
 		var subTitleSettings = {
-						align : 'center',
-						floating : true,
-						text: subTitleString,
-						style: fontSettings
-					}
+				align : 'center',
+				floating : true,
+				text: subTitleString,
+				style: fontSettings
+			}
 
-					// Select display type based on number of datapoints
+		// Select display type based on number of datapoints
 		if (plotData.length <= graphNumberLimit + 1){
 			eventGraph.MPChart({chartType: 'pie',
 				highchartsOptions: {
@@ -162,7 +163,7 @@ var table = $('#instantlyDestroyedTable').DataTable();
 // Called in Response to User Clicking On: limit device custom 
 //		input button click
 // Inputs: dataSet, an object of Device : value pairings
-function plotChart(dataSet){
+function createDataTable(dataSet){
 	// Graph data
 	plotGraph(dataSet);
 	
@@ -245,7 +246,7 @@ function plotChart(dataSet){
 // to a new device.
 // Called in Response to User Clicking On: dropdownLimit and model dropdown
 // Inputs: data, an array of device names
-function updateDataTablesSearch(data){
+function updateDataTablesSearchResults(data){
 	// Since the search function doesn't work for names with spaces, search
 	// by index value
 	if (data){
@@ -263,9 +264,7 @@ function updateDataTablesSearch(data){
 			itemString += '|' + "^\\s*"+indexValues[i].toString()+"\\s*$"  ;
 		}
 		// Order the list for use in other functions
-		console.log("updateDataTablesSearch, unsorted", indexValues);
 		indexValues.sort(sortByValue);
-		console.log("updateDataTablesSearch, sorted", indexValues);
 		// Store index values
 		propertiesList.deviceFilterNumbers = indexValues;
 		// Search the table and draw the output
