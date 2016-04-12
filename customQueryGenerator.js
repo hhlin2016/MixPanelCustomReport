@@ -2,6 +2,8 @@
 // Strings should have format of similar to:
 //		'(event.properties["App Name"] === "Friends" ||
 //		event.properties["App Name"] === "Robots") '
+// Called in Response to User Clicking On: Platform, appName, 
+//		and model dropdowns
 // Inputs: chosenNames dataset for identification parameters
 function updateFilterString(dropdownMenu){
 	// pull array of selected items
@@ -13,7 +15,8 @@ function updateFilterString(dropdownMenu){
 			title + '"] === ';
 		var selectedItemStrings = [];
 		for (var i = 0; i < itemList.length; i++){
-			var newEntry = stringCheckForItem(itemList[i], leftSideEquivalencyTest);
+			var newEntry = stringCheckForItem(itemList[i],
+			leftSideEquivalencyTest);
 			selectedItemStrings.push(newEntry);
 		}		
 		outputString += selectedItemStrings.join(' || ');
@@ -40,7 +43,7 @@ function stringCheckForItem(selectedItem, leftSideEquivalencyTest){
 	// length 1 come into play
 	// NOTE: isNaN function doesn't work when checking numbers in a string 
 	// so checking by length
-	if (selectedItem.length > 1 && selectedItem !== "undefined"){
+	if (isNaN(selectedItem) && selectedItem !== "undefined"){
 		outputString = leftSideEquivalencyTest + '"' + selectedItem + '"';
 	}
 	// A numerical input or undefined value, do not add quotations

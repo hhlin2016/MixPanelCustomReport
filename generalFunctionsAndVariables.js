@@ -22,8 +22,10 @@
 		initialSettings()
 */
 // Limiting variables for graph display
-var graphNumberLimit = 20; // maximum number of items for pie chart (switches to bar chart after)
-var graphDisplayUpperLimit = 100; // maximum number for display regardless of custom input
+var graphNumberLimit = 20; // maximum number of items for pie chart (switches 
+							//to bar chart after)
+var graphDisplayUpperLimit = 100; // maximum number for display regardless of 
+									//custom input
 
 // Set initial properties required for segmentation
 var propertiesList = {
@@ -35,9 +37,12 @@ var propertiesList = {
 	limit : 10
 }
 var dropdownVariables = {
-	platform : { title : 'Platform', ID : '.chosen-platform', stringName : "platformString"},
-	appName : { title : 'App Name', ID : '.chosen-appName', stringName : "appNameString"},
-	model : { title : '$model', ID : '.chosen-model', stringName : "deviceModelString"}
+	platform : { title : 'Platform', ID : '.chosen-platform', 
+		stringName : "platformString"},
+	appName : { title : 'App Name', ID : '.chosen-appName', 
+		stringName : "appNameString"},
+	model : { title : '$model', ID : '.chosen-model', 
+		stringName : "deviceModelString"}
 };
 
 // Store data from last pull (for use with limit changes)
@@ -96,15 +101,18 @@ var dropdownLimit
 var dropdownDates
 
 function initializeDropdownMenus() {
-	dropdownLimit = $('#numResultsSelect').MPSelect(limitOptions); // limit Options  
-	dropdownDates = $('#timeSelect').MPSelect(dateOptions);     // date Options
+	// limit Options  
+	dropdownLimit = $('#numResultsSelect').MPSelect(limitOptions); 
+	// date Options
+	dropdownDates = $('#timeSelect').MPSelect(dateOptions);     
 }
 
 // Function to update the Chosen dropdown menu selections
 // Input: dropdownVariables dataset for identification parameters, data, an 
 //		array of names
 function updateDropdownMenu(dropdownMenuVariables, data){
-	$(dropdownMenuVariables.ID).chosen(); // Initialize chosen plugin searchbox
+	// Initialize chosen plugin searchbox
+	$(dropdownMenuVariables.ID).chosen(); 
 	if (data){
 		for (var i = 0; i < data.length; i++){
 			newKey = data[i];
@@ -122,6 +130,8 @@ function updateDropdownMenu(dropdownMenuVariables, data){
 // Function to clear the Chosen Menu Options (essentially reset them),
 // 		propertiesList relevant String variable has to be cleared for new
 // 		custom_query call
+// Called in Response to User Clicking On: dropdownDates, datePicker, 
+//		appName dropdown, eventSelect, Platform dropdown
 // Inputs: dropdownVariables dataset for identification parameters
 function clearDropdownMenu(dropdownMenuVariables){
 	// Clear String property
@@ -137,6 +147,8 @@ function clearDropdownMenu(dropdownMenuVariables){
 }
 
 // Function to get data for the dropdown menus based on existing criteria
+// Called in Response to User Clicking On: dropdownDates, datePicker, 
+//		appName dropdown, eventSelect, Platform dropdown
 // Inputs: dropdownVariables dataset for identification parameters
 function getDropdownMenuData(dropdownMenuVariables){
 	var params = {
@@ -157,6 +169,7 @@ function getDropdownMenuData(dropdownMenuVariables){
 */
 // Function to update the selected time from the dropdown menu
 // Also shows/hides elements relating to the jQuery datePicker
+// Called in Response to User Clicking On: dropdownDates
 // Inputs: 	Integer, period indicating months to go back (-1 denotes
 // 			custom time period)
 function updateTime(period) {
@@ -181,6 +194,9 @@ function updateTime(period) {
 // Function to update the selected number of devices to show from the 
 // dropdown menu. Also shows/hides element relating to the custom input 
 // textbox and button if the user selected Select Custom Value
+// Called in Response to User Clicking On: dropdownLimit
+// Input: numDevices, integer value of how many devices the user wants
+// 		to see
 function customNumberDevicesSelect(numDevices) {
 	// Custom number of devices to show selected, show box and button
 	if (numDevices === -1){
@@ -213,7 +229,8 @@ function convertArrayToObject(data){
 	return outputData
 }
 
-// Function to parse and store a list of the sorted Device Names (sorted by number of users) and calculate the total number of users
+// Function to parse and store a list of the sorted Device Names (sorted by 
+//		number of users) and calculate the total number of users
 // Input: data, array of [Rank, Device Name, Num Users, Percentage Users]
 function parseBaseData(data){
 	deviceList = [];

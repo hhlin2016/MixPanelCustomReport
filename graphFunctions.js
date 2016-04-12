@@ -74,6 +74,7 @@ function plotGraphAllDevices(dataSet, plotLimit){
 	return plotData;
 }
 // Function to plot a graph using MPCharts
+// Called in Response to User Clicking On: model dropdown selection
 // Input: dataSet, array of [Rank, Device Name, Num Users, Percentage Users]
 function plotGraph(dataSet){
 	// Verify there is data to plot
@@ -109,7 +110,8 @@ function plotGraph(dataSet){
 		$(".mixpanel-platform-section").after(eventGraph)
 		
 		// Setup graph titles
-		var titleString = (plotData.length - otherDevicesCategory).toString() + ' of ' + deviceList.length + ' devices shown';
+		var titleString = (plotData.length - otherDevicesCategory).toString() 
+			+		' of ' + deviceList.length + ' devices shown';
 		var subTitleString = 'Total users: ' + totalNumUsers;
 		var fontSettings = { "color": "#333333", "fontSize": "18px" };
 		var titleSettings = {
@@ -152,10 +154,13 @@ function plotGraph(dataSet){
 }
 
 // DATATABLES IMPLEMENTATION
-// create dummy table for destruction (required for dataTablesChart function)
+// create dummy table for destruction (required for dataTablesChart
+// function)
 var table = $('#instantlyDestroyedTable').DataTable(); 
 
 // Function to create dataTable using jQuery plug-in, dataTables
+// Called in Response to User Clicking On: limit device custom 
+//		input button click
 // Inputs: dataSet, an object of Device : value pairings
 function plotChart(dataSet){
 	// Graph data
@@ -238,19 +243,21 @@ function plotChart(dataSet){
 // Note, this system requires a sorted list as it searches by index value due
 // device names sometimes having spaces which DataTables interprets as a split
 // to a new device.
+// Called in Response to User Clicking On: dropdownLimit and model dropdown
 // Inputs: data, an array of device names
 function updateDataTablesSearch(data){
-	// Since the search function doesn't work for names with spaces, search by index value
+	// Since the search function doesn't work for names with spaces, search
+	// by index value
 	if (data){
 		// Find index of each device
 		var indexValues = [];
 		for (var i = 0; i < data.length; i++){
 			indexValues.push(($.inArray(data[i], deviceList) + 1)); 
-			console.log("updateDataTablesSearch, value pushed: ", ($.inArray(data[i], deviceList) + 1));
 		}
 		// Create search string, additions on left and right side are so
 		// DataTables uses the exact value otherwise it would show everything
-		// that had a partial match as well (i.e. 7 would return 7, 17, 27, 70, etc.)
+		// that had a partial match as well (i.e. 7 would return 7, 17, 27,
+		// 70, etc.)
 		var itemString = "^\\s*"+indexValues[0].toString()+"\\s*$" ;		
 		for (var i = 1; i < indexValues.length; i++){
 			itemString += '|' + "^\\s*"+indexValues[i].toString()+"\\s*$"  ;
