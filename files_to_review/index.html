@@ -107,7 +107,7 @@
 					};
 					// Build script
 					var script = buildCustomQueryFunctionScript('$model', 1);
-//					console.log("runQuery", script, params);
+					console.log("runQuery", script, params);
 					// Get device data
 					MP.api.custom_query(script, params).done(function(results) {
 						// store data for use in dropdown and limit functions
@@ -117,58 +117,8 @@
 						// Plot data
 						createDataTable(results[0]);
 					});
-					testQuery();
 				}
 			};
-// TODO: TESTING ONLY, REMOVE
-function testQuery(){
-var eventName = eventSelect.MPEventSelect('value');
-if (eventName) {
-	// Parameters for custom query
-	var params = {
-		from_date: "2015-10-01",
-		to_date: "2016-04-11",
-		event: eventSelect.MPEventSelect('value')
-	};
-	// Build script
-	var script = 'function main() {\
-        return Events({\
-          from_date: params.from_date,\
-          to_date: params.to_date,\
-          event_selectors: [{event: params.event}]\
-        })\
-        .filter(function(event) { return (event.name === params.event ) })\
-        .groupByUser(["properties.App Name"],mixpanel.reducer.count())\
-        .groupBy(["key.1"],mixpanel.reducer.count())\
-       .reduce(function(previousData, object){\
-					var allData = [];\
-					var total = 0;\
-					for (var i = 0; i < previousData.length;i++){\
-						var elementPreviousData = previousData[i];\
-						for (var j = 0; j < elementPreviousData.length;j++){\
-							allData.push(elementPreviousData[j]);\
-						}\
-					}\
-					for (i=0; i<object.length; i++){\
-						var element = object[i].value.toString() + "    " +object[i].key["0"] ;\
-						if (element){\
-						  allData.push(element);\
-						}\
-						else{\
-						  allData.push("undefined");\
-						}\
-					}\
-					return allData;\
-				})\
-}';
-//	console.log("testQuery", script, params);
-	// Get device data
-	MP.api.custom_query(script, params).done(function(results) {
-		console.log("testQuery results", results)
-	});
-}
-}
-// END TESTING
 
 			// Function to set default variables (Event === 'App Started'), 
 			//		note time delay may need to be increased if it fails to 
