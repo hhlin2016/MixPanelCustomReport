@@ -253,6 +253,16 @@ function updateDataTablesSearchResults(data){
 		// Find index of each device
 		var indexValues = [];
 		for (var i = 0; i < data.length; i++){
+			var entry = data[i];
+			// Null and undefined types have been converted to string form on 
+			// selection. Convert back to types for comparison against the 
+			// deviceList
+			if (data[i] === "null"){
+				data[i] = null;
+			}
+			if (data[i] === "undefined") {
+				data[i] = undefined;
+			}
 			indexValues.push(($.inArray(data[i], deviceList) + 1)); 
 		}
 		// Create search string, additions on left and right side are so
