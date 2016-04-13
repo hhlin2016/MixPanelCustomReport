@@ -109,7 +109,7 @@
 					var script = buildCustomQueryFunctionScript('$model', 1);
 					console.log("runQuery", script, params);
 					// Get device data
-					MP.api.custom_query(script, params).done(function(results) {
+					MP.api.jql(script, params).done(function(results) {
 						// store data for use in dropdown and limit functions
 						lastDataPull = results[0];
 						// Calculate total users and build sorted device list
