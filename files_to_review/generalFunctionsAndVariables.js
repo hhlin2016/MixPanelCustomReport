@@ -30,15 +30,15 @@ var graphDisplayUpperLimit = 100; // maximum number for display regardless of
 // Set initial properties required for segmentation
 var propertiesList = {
 	appNameString : null,
-	platformString : null,
+	platformOSString : null,
 	deviceModelString: null,
 	from: moment().subtract(1, 'months').format("YYYY-MM-DD"),
 	to: moment().format("YYYY-MM-DD"),
 	limit : 10
 }
 var dropdownVariables = {
-	platform : { title : 'Platform', ID : '.chosen-platform', 
-		stringName : "platformString"},
+	platformOS : { title : 'Platform', ID : '.chosen-platformOS', 
+		stringName : "platformOSString"},
 	appName : { title : 'App Name', ID : '.chosen-appName', 
 		stringName : "appNameString"},
 	model : { title : '$model', ID : '.chosen-model', 
@@ -59,7 +59,7 @@ function initializeChosenInterface(){
 
 	// Initialize Chosen Interface
 	$('.chosen-model').chosen().val();
-	$('.chosen-platform').chosen().val();
+	$('.chosen-platformOS').chosen().val();
 	$('.chosen-appName').chosen().val();
 }
 
@@ -96,15 +96,37 @@ var dateOptions = {
 	]
 };
 
+// Dropdown Platform or OS Options
+	items: [
+		{label: 'Platform', value: 'Platform'},
+		{label: 'OS', value: 'OS'}
+	]
+};
+
 // Instantiate dropdown menus
 var dropdownLimit
 var dropdownDates
+var dropdownPlatformOS
 
 function initializeDropdownMenus() {
 	// limit Options  
 	dropdownLimit = $('#numResultsSelect').MPSelect(limitOptions); 
 	// date Options
 	dropdownDates = $('#timeSelect').MPSelect(dateOptions);     
+	// Select Platform or OS
+}
+
+function updatePlatformOS(PlatformOSSelection) {
+	switch (PlatformOSSelection){
+		case 'Platform':	dropdownVariables['platformOS'] = { title : 'Platform', ID : '.chosen-platformOS', 
+			stringName : "platformOSString"};
+			break;
+		case 'OS':	dropdownVariables['platformOS'] = { title : '$os', ID : '.chosen-platformOS', 
+			stringName : "platformOSString"};
+			break;
+		default:
+			console.log("updatePlatformOS, invalid input option");
+	}
 }
 
 // Function to update the Chosen dropdown menu selections
@@ -157,7 +179,7 @@ function updateDropdownMenuData(dropdownMenuVariables){
 		event: eventSelect.MPEventSelect('value')
 	};
 	var script = buildCustomQueryFunctionScript(dropdownMenuVariables.title, 0);
-	MP.api.custom_query(script, params).done(function(results) {
+	MP.api.jql(script, params).done(function(results) {
 		updateDropdownMenu(dropdownMenuVariables, results[0]);
 	});		
 }

@@ -116,14 +116,16 @@ function plotGraph(dataSet){
 		var subTitleString = 'Total users: ' + totalNumUsers;
 		var fontSettings = { "color": "#333333", "fontSize": "18px" };
 		var titleSettings = {
-				align : 'center',
 				floating : true,
+				align: 'right',
+				x: -70,
 				text: titleString,
 				style: fontSettings
 			};
 		var subTitleSettings = {
-				align : 'center',
 				floating : true,
+				align: 'right',
+				x: -70,
 				text: subTitleString,
 				style: fontSettings
 			}

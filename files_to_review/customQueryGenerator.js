@@ -78,8 +78,8 @@ function buildCustomQueryFunctionScript(propertySelector, selector){
 	var eventFilter = '.filter(function(event) { return (event.name === params.event ) })';
 	// filter by properties (Platform, App Name, and $model)
 	var propertyFilters = '';
-	if (propertiesList.platformString){
-		propertyFilters += '.filter(function(event) { return (' + propertiesList.platformString +' ) })';
+	if (propertiesList.platformOSString){
+		propertyFilters += '.filter(function(event) { return (' + propertiesList.platformOSString +' ) })';
 	}
 	if (propertiesList.appNameString){
 		propertyFilters += '.filter(function(event) { return (' + propertiesList.appNameString +' ) })';
