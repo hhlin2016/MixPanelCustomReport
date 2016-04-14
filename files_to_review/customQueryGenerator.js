@@ -77,7 +77,8 @@ function buildCustomQueryFunctionScript(propertySelector, selector){
 	// filter by event
 	var eventFilter = '.filter(function(event) { return (event.name === params.event ) })';
 	// Remove null and undefined entries in Platform
-	var generalPlatformFilter = '.filter(function(event) { return (event.properties.Platform)})';
+	var generalPlatformOSFilter = '.filter(function(event) { return (event.properties.' + 
+		dropdownVariables.platformOS.title + ')})';
 	// filter by properties (Platform, App Name, and $model)
 	var propertyFilters = '';
 	if (propertiesList.platformOSString){
@@ -167,6 +168,6 @@ function buildCustomQueryFunctionScript(propertySelector, selector){
 			console.log("buildCustomQueryFunctionScript, incorrect selector value");
 	}
 	// Build the whole script and return
-	outputString = startFunction + generalPlatformFilter + eventFilter + propertyFilters + groupByString + reducer + map + '}';
+	outputString = startFunction + generalPlatformOSFilter + eventFilter + propertyFilters + groupByString + reducer + map + '}';
 	return outputString;
 }

@@ -259,6 +259,8 @@ function updateDataTablesSearchResults(data){
 			// Null and undefined types have been converted to string form on 
 			// selection. Convert back to types for comparison against the 
 			// deviceList
+			// TODO: Due to changes in customQueryGenerator, should no longer
+			// receive these entries. Consider removing check.
 			if (data[i] === "null"){
 				data[i] = null;
 			}
