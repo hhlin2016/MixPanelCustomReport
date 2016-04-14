@@ -76,6 +76,7 @@ function buildCustomQueryFunctionScript(propertySelector, selector){
 				event_selectors: [{event: params.event}]})';
 	// filter by event
 	var eventFilter = '.filter(function(event) { return (event.name === params.event ) })';
+	// Remove null and undefined entries in Platform
 	var generalPlatformFilter = '.filter(function(event) { return (event.properties.Platform)})';
 	// filter by properties (Platform, App Name, and $model)
 	var propertyFilters = '';
