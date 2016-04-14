@@ -141,9 +141,16 @@ function updatePlatformOS(PlatformOSSelection) {
 		case 'Platform':	dropdownVariables['platformOS'] = { title : 
 			'Platform', ID : '.chosen-platformOS', stringName : 
 			"platformOSString"};
+			$(".chosen-platformOS").attr("data-placeholder", 
+				"Select Platform(s), leave empty for all");
+			$(".chosen-platformOS").trigger("chosen:updated");
 			break;
 		case 'OS':	dropdownVariables['platformOS'] = { title : '$os', 
 			ID : '.chosen-platformOS', stringName : "platformOSString"};
+			//$('.chosen-platformOS').chosen()
+			$(".chosen-platformOS").attr("data-placeholder", 
+				"Select OS(es), leave empty for all");
+			$(".chosen-platformOS").trigger("chosen:updated");
 			break;
 		default:
 			console.log("updatePlatformOS, invalid input option");
