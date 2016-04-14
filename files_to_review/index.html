@@ -15,6 +15,7 @@
 		<script src="exportToCSV.js"></script>
 		<script src="generalFunctionsAndVariables.js"></script>
 		<script src="graphFunctions.js"></script>
+		<script src="listAppleDevices.js"></script>
 	</head>
 	<body class="mixpanel-platform-body">
 		<div class="mixpanel-platform-section">
@@ -23,25 +24,30 @@
 				style="width: 258px; padding: 10 px">Select Event</div>
 			<div id="eventSelect" style="float: left;"></div>
 			
+			<!-- Adjust for Apple Models -->
+			<div id="labelAdjustForAppleModels" class="mixpanel-platform-label" style=
+				"float: left; width: 200px; margin-left: 25px">Adjust for Apple Models</div>
+			<div id="selectAdjustForAppleModels" style="width: 100px; float: left; "></div>
+			
 			<!-- Select Operating System -->
 			<div style="clear: both;"></div>
-			<div id="labelSelectPlatforms" class="mixpanel-platform-label" 
-				style="width: 258px; padding: 10 px">Select Platform(s)</div>
-			<select data-placeholder="Select Platform(s), leave empty for all" 
-				class="chosen-platform" multiple="true" style="width: calc(100% - 300px); float:right" ></select>
+			<div id="selectPlatformOS" style="float: left; margin-right: 10px"></div>
+			<select data-placeholder="Select Platform(s) or OS(es), leave empty for 
+				all" class="chosen-platformOS" multiple="true" style="width: 
+				calc(100% - 300px); float:right" ></select>
 			
 			<!-- Select App Name(s) -->
-			<div style="clear: both;"></div>
+			<div style="clear: both;"></div><br>
 			<div id="labelSelectAppNames" class="mixpanel-platform-label" style=
-				"width: 258px; padding: 10 px">Select Application(s)</div>
+				"width: 258px; ">Select Application(s)</div>
 			<select data-placeholder="Select App(s), leave empty for all" class=
-				"chosen-appName" multiple="true" style="width: calc(100% - 300px); float:right">
-				</select>
+				"chosen-appName" multiple="true" style="width: calc(100% - 300px); 
+				float:right"></select>
 				
 			<!-- Select Device Models -->
 			<div style="clear: both;"></div>
 			<div id="labelSelectDeviceModels" class="mixpanel-platform-label" 
-				style="width: 258px; padding: 10 px">Select Device Model(s)</div>
+				style="width: 258px; ">Select Device Model(s)</div>
 			<select data-placeholder="Select Model(s), leave empty for all" class=
 				"chosen-model" multiple="true" style="width: calc(100% - 
 				300px); float:right" ></select>
@@ -49,7 +55,7 @@
 			
 			<!-- Select Number of Devices to be Shown -->
 			<div id="labelNumDevices" class="mixpanel-platform-label" style="width: 
-				258px; padding: 10 px">Show Number of Devices</div>
+				258px; ">Show Number of Devices</div>
 			<div id="numResultsSelect" style="float: left;"></div>
 			
 			<div style="padding:10px; float: left; width: 175px;"><input 
@@ -62,16 +68,16 @@
 			<!-- Select Dates -->
 			<div style="clear: both;"></div>
 			<div id="labelSelectDates" class="mixpanel-platform-label" style=
-				"width: 258px; padding: 10 px">Select Time Period</div>
+				"width: 258px;">Select Time Period</div>
 			<div id="timeSelect" style="float: left;" placeholder = "Select a 
 				time period"></div>
 			<div id="labelFrom" class = "timeSelectGroup" style="display: 
-				none; float: left; padding: 10px; ">From:</div>
+				none; float: left; margin-left: 10px; ">From:</div>
 			<input type="text" id="from" class = "timeSelectGroup" name="from" 
 				style="width: 80px; float: left; display: none;" placeholder=
 				"Start date:">
 			<div id="labelTo" class = "timeSelectGroup" style="display: none; 
-				float: left; padding: 10px;">To:</div>
+				float: left; margin-left: 10px;">To:</div>
 			<input type="text" id="to" class = "timeSelectGroup" name="to" 
 				style="width: 80px; float: left; display: none;" placeholder=
 				"End date:">
@@ -107,18 +113,23 @@
 					};
 					// Build script
 					var script = buildCustomQueryFunctionScript('$model', 1);
-					console.log("runQuery", script, params);
 					// Get device data
-					MP.api.custom_query(script, params).done(function(results) {
+					MP.api.jql(script, params).done(function(results) {
+						var data = results[0];
+						// If the user has selected to adjust data for Apple Names, alter the data list before further processing
+						if (propertiesList.adjustForApple){
+							data = adjustDataForApple(data);
+						}
 						// store data for use in dropdown and limit functions
-						lastDataPull = results[0];
+						lastDataPull = data;
 						// Calculate total users and build sorted device list
-						parseBaseData(results[0]);
+						parseBaseData(data);
 						// Plot data
-						createDataTable(results[0]);
+						createDataTable(data);
 					});
 				}
 			};
+			
 			// Function to set default variables (Event === 'App Started'), 
 			//		note time delay may need to be increased if it fails to 
 			//		load appropriately
@@ -137,23 +148,41 @@
 				customNumberDevicesSelect(selection);
 				updateDataTablesSearchResults(selectedDeviceModels);
 			});
-			
-			eventSelect.on('change', function(e, eventName) {
-				console.log("Event change", eventName);
-				clearDropdownMenu(dropdownVariables['platform']);
+			dropdownPlatformOS.on('change', function(e, selection) { 
+				console.log("Change Platform or OS", selection);
+				updatePlatformOS(selection);
+				clearDropdownMenu(dropdownVariables['platformOS']);
 				clearDropdownMenu(dropdownVariables['appName']);
 				clearDropdownMenu(dropdownVariables['model']);
-				updateDropdownMenuData(dropdownVariables['platform']);
+				updateDropdownMenuData(dropdownVariables['platformOS']);
 				updateDropdownMenuData(dropdownVariables['appName']);
 				updateDropdownMenuData(dropdownVariables['model']);
 				runQuery();
 			});
-			$( ".chosen-platform" ).change(function() {
-				var selectedPlatforms = $('.chosen-platform').chosen().val()
+			// Consideration - creating a new data set for Apple Devices would allow for fewer calls to the server when this switch changes however that would require a large restructuring of the code whereas the largest lag time is actually in populating the device lists, not sending and receiving data from the MixPanel server so making server calls is actually a very small cost hence why it is used here instead of restructuring everything.
+			dropdownAdjustForAppleModels.on('change', function(e, selection) { 
+				propertiesList.adjustForApple = selection;
+				console.log("Adjust for Apple Models or Not", selection, propertiesList.adjustForApple);
+				clearDropdownMenu(dropdownVariables['model']);
+				updateDropdownMenuData(dropdownVariables['model']);
+				runQuery();
+			});
+			eventSelect.on('change', function(e, eventName) {
+				console.log("Event change", eventName);
+				clearDropdownMenu(dropdownVariables['platformOS']);
+				clearDropdownMenu(dropdownVariables['appName']);
+				clearDropdownMenu(dropdownVariables['model']);
+				updateDropdownMenuData(dropdownVariables['platformOS']);
+				updateDropdownMenuData(dropdownVariables['appName']);
+				updateDropdownMenuData(dropdownVariables['model']);
+				runQuery();
+			});
+			$( ".chosen-platformOS" ).change(function() {
+				var selectedPlatforms = $('.chosen-platformOS').chosen().val()
 				console.log("Change Platform", selectedPlatforms);
 				clearDropdownMenu(dropdownVariables['appName']);
 				clearDropdownMenu(dropdownVariables['model']);
-				updateFilterString(dropdownVariables['platform']);
+				updateFilterString(dropdownVariables['platformOS']);
 				updateDropdownMenuData(dropdownVariables['appName']);
 				updateDropdownMenuData(dropdownVariables['model']);
 				runQuery();
@@ -169,16 +198,16 @@
 			$( ".chosen-model" ).change(function() {
 				var selectedDeviceModels = $('.chosen-model').chosen().val()
 				console.log("Change model", selectedDeviceModels);
-				updateFilterString(dropdownVariables['model']);
+				//updateFilterString(dropdownVariables['model']); // TODO: REMOVE model string, there's no use for it since it's not being sent back to server due to local search
 				updateDataTablesSearchResults(selectedDeviceModels);
 				plotGraph(lastDataPull);
 			});
 			dropdownDates.on('change', function(e, selection){
 				updateTime(selection);
-				clearDropdownMenu(dropdownVariables['platform']);
+				clearDropdownMenu(dropdownVariables['platformOS']);
 				clearDropdownMenu(dropdownVariables['appName']);
 				clearDropdownMenu(dropdownVariables['model']);
-				updateDropdownMenuData(dropdownVariables['platform']);
+				updateDropdownMenuData(dropdownVariables['platformOS']);
 				updateDropdownMenuData(dropdownVariables['appName']);
 				updateDropdownMenuData(dropdownVariables['model']);
 				
@@ -196,10 +225,10 @@
 						// prevent users from selecting dates past the 'to' date
 						$( "#to" ).datepicker( "option", "minDate", selectedDate );
 						propertiesList["from"] = selectedDate;
-						clearDropdownMenu(dropdownVariables['platform']);
+						clearDropdownMenu(dropdownVariables['platformOS']);
 						clearDropdownMenu(dropdownVariables['appName']);
 						clearDropdownMenu(dropdownVariables['model']);
-						updateDropdownMenuData(dropdownVariables['platform']);
+						updateDropdownMenuData(dropdownVariables['platformOS']);
 						updateDropdownMenuData(dropdownVariables['appName']);
 						updateDropdownMenuData(dropdownVariables['model']);
 						runQuery();
@@ -216,10 +245,10 @@
 						// prevent users from selecting dates before the 'from' date
 						$( "#from" ).datepicker( "option", "maxDate", selectedDate );
 						propertiesList["to"] = selectedDate;
-						clearDropdownMenu(dropdownVariables['platform']);
+						clearDropdownMenu(dropdownVariables['platformOS']);
 						clearDropdownMenu(dropdownVariables['appName']);
 						clearDropdownMenu(dropdownVariables['model']);
-						updateDropdownMenuData(dropdownVariables['platform']);
+						updateDropdownMenuData(dropdownVariables['platformOS']);
 						updateDropdownMenuData(dropdownVariables['appName']);
 						updateDropdownMenuData(dropdownVariables['model']);
 						runQuery();

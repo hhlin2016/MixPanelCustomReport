@@ -293,15 +293,3 @@ function updateDataTablesSearchResults(data){
 	}
 }
 
-// Function to sort a list with, smallest to largest
-// Note: this function is necessary as the standard sort function uses
-//		== which means when you have an array of [12, 13, 15, 37, 2]
-//		The result would be [12, 13, 15, 2, 37] in javascript
-function sortByValue(a, b) {
-	if (a === b) {
-		return 0;
-	}
-	else {
-		return (a < b) ? -1 : 1; // largest to smallest
-	}
-}
