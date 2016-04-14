@@ -157,7 +157,7 @@ function updateDropdownMenuData(dropdownMenuVariables){
 		event: eventSelect.MPEventSelect('value')
 	};
 	var script = buildCustomQueryFunctionScript(dropdownMenuVariables.title, 0);
-	MP.api.custom_query(script, params).done(function(results) {
+	MP.api.jql(script, params).done(function(results) {
 		updateDropdownMenu(dropdownMenuVariables, results[0]);
 	});		
 }
