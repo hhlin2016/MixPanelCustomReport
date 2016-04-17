@@ -18,6 +18,27 @@
 		<script src="listAppleDevices.js"></script>
 	</head>
 	<body class="mixpanel-platform-body">
+		<!-- Loading overlay -->
+		<style>
+			#overlay {
+				background: #ffffff;
+				color: #666666;
+				position: fixed;
+				height: 100%;
+				width: 100%;
+				z-index: 5000;
+				top: 0;
+				left: 0;
+				float: left;
+				text-align: center;
+				padding-top: 25%;
+			}
+		</style>
+		<div id="overlay">
+			<img src="loader.gif" alt="Loading" /><br/>
+			Loading...
+		</div>
+		<!-- Main Body -->
 		<div class="mixpanel-platform-section">
 			<!-- Event Select -->
 			<div id="labelSelectEvent" class="mixpanel-platform-label" 
@@ -143,12 +164,15 @@
 			ON CHANGE effects
 			*/
 			dropdownLimit.on('change', function(e, selection) { 
+				$('#overlay').fadeIn(); // Apply the loading overlay
 				var selectedDeviceModels = $('.chosen-model').chosen().val()
 				console.log("Change Limit", selection);
 				customNumberDevicesSelect(selection);
 				updateDataTablesSearchResults(selectedDeviceModels);
+				$('#overlay').fadeOut(); // Remove the loading overlay
 			});
-			dropdownPlatformOS.on('change', function(e, selection) { 
+			dropdownPlatformOS.on('change', function(e, selection) {
+				$('#overlay').fadeIn(); // Apply the loading overlay
 				console.log("Change Platform or OS", selection);
 				updatePlatformOS(selection);
 				clearDropdownMenu(dropdownVariables['platformOS']);
@@ -158,16 +182,20 @@
 				updateDropdownMenuData(dropdownVariables['appName']);
 				updateDropdownMenuData(dropdownVariables['model']);
 				runQuery();
+				$('#overlay').fadeOut(); // Remove the loading overlay
 			});
 			// Consideration - creating a new data set for Apple Devices would allow for fewer calls to the server when this switch changes however that would require a large restructuring of the code whereas the largest lag time is actually in populating the device lists, not sending and receiving data from the MixPanel server so making server calls is actually a very small cost hence why it is used here instead of restructuring everything.
 			dropdownAdjustForAppleModels.on('change', function(e, selection) { 
+				$('#overlay').fadeIn(); // Apply the loading overlay
 				propertiesList.adjustForApple = selection;
 				console.log("Adjust for Apple Models or Not", selection, propertiesList.adjustForApple);
 				clearDropdownMenu(dropdownVariables['model']);
 				updateDropdownMenuData(dropdownVariables['model']);
 				runQuery();
+				$('#overlay').fadeOut(); // Remove the loading overlay
 			});
 			eventSelect.on('change', function(e, eventName) {
+				$('#overlay').fadeIn(); // Apply the loading overlay
 				console.log("Event change", eventName);
 				clearDropdownMenu(dropdownVariables['platformOS']);
 				clearDropdownMenu(dropdownVariables['appName']);
@@ -176,8 +204,10 @@
 				updateDropdownMenuData(dropdownVariables['appName']);
 				updateDropdownMenuData(dropdownVariables['model']);
 				runQuery();
+				$('#overlay').fadeOut(); // Remove the loading overlay
 			});
 			$( ".chosen-platformOS" ).change(function() {
+				$('#overlay').fadeIn(); // Apply the loading overlay
 				var selectedPlatforms = $('.chosen-platformOS').chosen().val()
 				console.log("Change Platform", selectedPlatforms);
 				clearDropdownMenu(dropdownVariables['appName']);
@@ -186,23 +216,29 @@
 				updateDropdownMenuData(dropdownVariables['appName']);
 				updateDropdownMenuData(dropdownVariables['model']);
 				runQuery();
+				$('#overlay').fadeOut(); // Remove the loading overlay
 			});
 			$( ".chosen-appName" ).change(function() {
+				$('#overlay').fadeIn(); // Apply the loading overlay
 				var selectedAppNames = $('.chosen-appName').chosen().val()
 				console.log("Change appName", selectedAppNames);;
 				clearDropdownMenu(dropdownVariables['model']);
 				updateFilterString(dropdownVariables['appName']);
 				updateDropdownMenuData(dropdownVariables['model']);
 				runQuery();
+				$('#overlay').fadeOut(); // Remove the loading overlay
 			});
 			$( ".chosen-model" ).change(function() {
+				$('#overlay').fadeIn(); // Apply the loading overlay
 				var selectedDeviceModels = $('.chosen-model').chosen().val()
 				console.log("Change model", selectedDeviceModels);
 				//updateFilterString(dropdownVariables['model']); // TODO: REMOVE model string, there's no use for it since it's not being sent back to server due to local search
 				updateDataTablesSearchResults(selectedDeviceModels);
 				plotGraph(lastDataPull);
+				$('#overlay').fadeOut(); // Remove the loading overlay
 			});
 			dropdownDates.on('change', function(e, selection){
+				$('#overlay').fadeIn(); // Apply the loading overlay
 				updateTime(selection);
 				clearDropdownMenu(dropdownVariables['platformOS']);
 				clearDropdownMenu(dropdownVariables['appName']);
@@ -210,8 +246,8 @@
 				updateDropdownMenuData(dropdownVariables['platformOS']);
 				updateDropdownMenuData(dropdownVariables['appName']);
 				updateDropdownMenuData(dropdownVariables['model']);
-				
 				runQuery();
+				$('#overlay').fadeOut(); // Remove the loading overlay
 			});
 			// Date picker, action on close
 			$(function() {
@@ -222,6 +258,7 @@
 					numberOfMonths: 2,
 					maxDate: propertiesList["to"],
 					onClose: function( selectedDate ) {
+						$('#overlay').fadeIn(); // Apply the loading overlay
 						// prevent users from selecting dates past the 'to' date
 						$( "#to" ).datepicker( "option", "minDate", selectedDate );
 						propertiesList["from"] = selectedDate;
@@ -232,6 +269,7 @@
 						updateDropdownMenuData(dropdownVariables['appName']);
 						updateDropdownMenuData(dropdownVariables['model']);
 						runQuery();
+						$('#overlay').fadeOut(); // Remove the loading overlay
 					}
 				});
 				
@@ -242,6 +280,7 @@
 					numberOfMonths: 2,
 					maxDate: new Date(),
 					onClose: function( selectedDate ) {
+						$('#overlay').fadeIn(); // Apply the loading overlay
 						// prevent users from selecting dates before the 'from' date
 						$( "#from" ).datepicker( "option", "maxDate", selectedDate );
 						propertiesList["to"] = selectedDate;
@@ -252,14 +291,17 @@
 						updateDropdownMenuData(dropdownVariables['appName']);
 						updateDropdownMenuData(dropdownVariables['model']);
 						runQuery();
+						$('#overlay').fadeOut(); // Remove the loading overlay
 					}
 				});
 			});
 			// Limit Device Textbox
 			$("#btnNumDevicesSubmit").click(function () {	
+				$('#overlay').fadeIn(); // Apply the loading overlay
 				var textboxValue = tbxNumResultsSelect.value
 				propertiesList['limit'] = textboxValue;
-				createDataTable(lastDataPull);		
+				createDataTable(lastDataPull);	
+				$('#overlay').fadeOut(); // Remove the loading overlay				
 			});
 		</script>
 	</body>
