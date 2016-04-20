@@ -23,6 +23,7 @@
 			eventGraph
 		initialSettings()
 */
+
 // Limiting variables for graph display
 var graphNumberLimit = 20; // maximum number of items for pie chart (switches 
 							//to bar chart after)
@@ -208,18 +209,14 @@ function updateDropdownMenuData(dropdownMenuVariables){
 		event: eventSelect.MPEventSelect('value')
 	};
 	var script = buildCustomQueryFunctionScript(dropdownMenuVariables.title, 0);
+	// Reset found device list
 	MP.api.jql(script, params).done(function(results) {
 		var data = results[0];
-//		console.log("updateDropdownMenuData, unmorphed data", data)
 		// Updating model list but need to adjust for Apple entries first
 		if (dropdownMenuVariables.title === '$model' && propertiesList.adjustForApple){	
 			data = adjustTitlesForApple(data);
 		}
-		else{
-			appleDevicesInList = {};
-		}
 		updateDropdownMenu(dropdownMenuVariables, data);
-		
 	});		
 }
 
@@ -229,6 +226,7 @@ function updateDropdownMenuData(dropdownMenuVariables){
 		updateTime(period)
 		customNumberDevicesSelect(numDevices) {
 */
+
 // Function to update the selected time from the dropdown menu
 // Also shows/hides elements relating to the jQuery datePicker
 // Called in Response to User Clicking On: dropdownDates
@@ -278,6 +276,7 @@ function customNumberDevicesSelect(numDevices) {
 		convertArrayToObject(data)
 		parseBaseData(data)
 */
+
 // Function to convert Array data to a JSON object for MPCharts
 // Input: Array of [Device Name, Number of Users] sub-arrays
 function convertArrayToObject(data){
@@ -376,11 +375,14 @@ function sortByIndex1(a, b) {
 // the appleDevices list
 // Inputs: data, an Array of [Rank, Device Name, # users, % users] sub-arrays
 // Outputs: data, an Array of [Rank, Device Name, # users, % users] sub-arrays
-// CONSIDER: The data is being pulled in [Rank, Device Name, # Users, % Users] format. We actually need the data in [Device Name, # Users], consider adding a new script type that uses a reducer function for this purpose instead. It would reduce n computations as we loop through the list here to create a new list which we then add the Rank and % values to
+// CONSIDER: The data is being pulled in [Rank, Device Name, # Users, % Users] 
+// format. We actually need the data in [Device Name, # Users], consider adding 
+// a new script type that uses a reducer function for this purpose instead. 
+// It would reduce n computations as we loop through the list here to create 
+// a new list which we then add the Rank and % values to
 function adjustDataForApple(data){
 	// Need indexes of devices
 	parseBaseData(data);
-	console.log("adjustDataForApple, device list", deviceList)
 	var newData = [];
 	var locationData = [];
 	var newResults = [];
@@ -391,8 +393,11 @@ function adjustDataForApple(data){
 		for (var j = 0; j < foundAppleDevices.length; j++){
 			var device = foundAppleDevices[j];
 			var locationDeviceInList = $.inArray(device, deviceList);
-			locationData.push(locationDeviceInList);
-			appleDeviceSum+= data[locationDeviceInList][2];
+			// Make sure the location exists before summing
+			if (locationDeviceInList >= 0){
+				locationData.push(locationDeviceInList);
+				appleDeviceSum+= data[locationDeviceInList][2];
+			}
 		}
 		var newEntry = [appleKeys[i], appleDeviceSum];
 		newData.push(newEntry);
@@ -413,7 +418,7 @@ function adjustDataForApple(data){
 		}
 	}
 	newData.sort(sortByIndex1);				
-	// Reparse data to [Rank, Device Name, # Users, % Users]
+	// Re-parse data to [Rank, Device Name, # Users, % Users]
 	for (var i = 0; i < newData.length; i++) {
 		var element = newData[i];
 		var newElement = [i+1, element[0], element[1], parseFloat(element[1]
@@ -428,7 +433,9 @@ function adjustDataForApple(data){
 // the appleDevices list, used for setting of model dropdown menu
 // Inputs: data, a list of device names
 // Outputs: data, a list of device names
-function adjustTitlesForApple(data){		
+function adjustTitlesForApple(data){	
+	// Clear list of found apple items
+	appleDevicesInList = {};
 	// get cumulative device list and total number of users
 	// Check against each of the Apple Devices to see if their entries exist in the 
 	var appleKeys = Object.keys(appleDevices);
@@ -448,7 +455,7 @@ function adjustTitlesForApple(data){
 				foundAppleDevicesForThisKey.push(appleElement[j]);
 			}
 		}
-		// Add original Apple Device to list of Applie devices
+		// Add original Apple Device to list of Apple devices
 		if (foundAppleDevicesForThisKey.length > 0){
 			appleDevicesInList[appleKeys[i]] = foundAppleDevicesForThisKey;
 		}
