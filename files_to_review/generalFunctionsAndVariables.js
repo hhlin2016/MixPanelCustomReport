@@ -126,6 +126,7 @@ var dropdownDates;
 var dropdownPlatformOS;
 var dropdownAdjustForAppleModels;
 
+// initialize the Chosen dropdown menus
 function initializeDropdownMenus() {
 	// limit Options  
 	dropdownLimit = $('#numResultsSelect').MPSelect(limitOptions); 
@@ -134,9 +135,40 @@ function initializeDropdownMenus() {
 	// Select Platform or OS
 	dropdownPlatformOS = $('#selectPlatformOS').MPSelect(platformOSOptions);     
 	// Select to Adjust for Apple Model Names or not
-	dropdownAdjustForAppleModels = $('#selectAdjustForAppleModels').MPSelect(AppleAdjustmentOptions);     
+	dropdownAdjustForAppleModels = $('#selectAdjustForAppleModels').
+		MPSelect(AppleAdjustmentOptions);     
 }
 
+// Show or hide Adjust for Apple Models depending on selection
+// Input: array of Platform or OS selections
+function displayAdjustForAppleModels(selection) {
+	console.log("displayAdjustForAppleModels called", selection)
+	var checkItems = ['iOS', 'iPhone OS'];
+	var displayAdjustment = -1;
+	for (var i = 0; i < checkItems.length; i++){
+		displayAdjustment = $.inArray(checkItems[i], selection);
+		// Found entry, end loop
+		if (displayAdjustment >= 0) {
+			break;
+		}
+	}
+	// Set menu to default
+	$("#selectAdjustForAppleModels").val(false);
+	propertiesList.adjustForApple = false;
+	// iOS or iPhone OS selected or show all (Apple models may be in list)
+	// show adjustment
+	if (displayAdjustment >= 0 || !selection) {
+		$(".adjustForAppleModels").show();
+	}
+	// selected non-Apple products, hide Adjustment
+	else {
+		$(".adjustForAppleModels").hide();
+	}
+}
+
+
+// Update the Dictionary entry for PlatformOS
+// Input: PlatformOSSelection, String, either Platform or OS
 function updatePlatformOS(PlatformOSSelection) {
 	switch (PlatformOSSelection){
 		case 'Platform':	dropdownVariables['platformOS'] = { title : 

@@ -46,9 +46,9 @@
 			<div id="eventSelect" style="float: left;"></div>
 			
 			<!-- Adjust for Apple Models -->
-			<div id="labelAdjustForAppleModels" class="mixpanel-platform-label" style=
+			<div id="labelAdjustForAppleModels" class="mixpanel-platform-label adjustForAppleModels" style=
 				"float: left; width: 200px; margin-left: 25px">Adjust for Apple Models</div>
-			<div id="selectAdjustForAppleModels" style="width: 100px; float: left; "></div>
+			<div id="selectAdjustForAppleModels" class="adjustForAppleModels" style="width: 100px; float: left; "></div>
 			
 			<!-- Select Operating System -->
 			<div style="clear: both;"></div>
@@ -209,6 +209,7 @@
 			$( ".chosen-platformOS" ).change(function() {
 				$('#overlay').fadeIn(); // Apply the loading overlay
 				var selectedPlatforms = $('.chosen-platformOS').chosen().val()
+				displayAdjustForAppleModels(selectedPlatforms);
 				console.log("Change Platform", selectedPlatforms);
 				clearDropdownMenu(dropdownVariables['appName']);
 				clearDropdownMenu(dropdownVariables['model']);
