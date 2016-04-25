@@ -1,6 +1,8 @@
 // Function to reorganize the data to limit parameter constraints
 // Inputs: data, an Array of sub-arrays (defined below),
-//			limit, Integer value of maximum allowed devices,
+//			where setting === 0, data is in [Name, value] format,
+//			where setting === 1, data is in [Rank, Name, value, percentage] 
+//			format. limit, Integer value of maximum allowed devices,
 //			setting, Integer value depending on structure of input
 //			data
 function reduceLength(data, limit, setting){
@@ -34,7 +36,6 @@ function reduceLength(data, limit, setting){
 // Input: dataSet, array of [Rank, Device Name, Num Users, Percentage Users],
 //			plotLimit, integer value denoting how many items can be displayed
 function plotGraphSelectedDevices(dataSet, plotLimit){
-	console.log(dataSet, propertiesList.deviceFilterNumbers)
 	plotData = [];
 	var sum = 0;
 	// Go through each selected device and pull it from the overall list
@@ -115,19 +116,21 @@ function plotGraph(dataSet){
 		var subTitleString = 'Total users: ' + totalNumUsers;
 		var fontSettings = { "color": "#333333", "fontSize": "18px" };
 		var titleSettings = {
-						align : 'center',
-						floating : true,
-						text: titleString,
-						style: fontSettings
-					};
+				floating : true,
+				align: 'right',
+				x: -70,
+				text: titleString,
+				style: fontSettings
+			};
 		var subTitleSettings = {
-						align : 'center',
-						floating : true,
-						text: subTitleString,
-						style: fontSettings
-					}
+				floating : true,
+				align: 'right',
+				x: -70,
+				text: subTitleString,
+				style: fontSettings
+			}
 
-					// Select display type based on number of datapoints
+		// Select display type based on number of datapoints
 		if (plotData.length <= graphNumberLimit + 1){
 			eventGraph.MPChart({chartType: 'pie',
 				highchartsOptions: {
@@ -162,7 +165,7 @@ var table = $('#instantlyDestroyedTable').DataTable();
 // Called in Response to User Clicking On: limit device custom 
 //		input button click
 // Inputs: dataSet, an object of Device : value pairings
-function plotChart(dataSet){
+function createDataTable(dataSet){
 	// Graph data
 	plotGraph(dataSet);
 	
@@ -245,13 +248,25 @@ function plotChart(dataSet){
 // to a new device.
 // Called in Response to User Clicking On: dropdownLimit and model dropdown
 // Inputs: data, an array of device names
-function updateDataTablesSearch(data){
+function updateDataTablesSearchResults(data){
 	// Since the search function doesn't work for names with spaces, search
 	// by index value
 	if (data){
 		// Find index of each device
 		var indexValues = [];
 		for (var i = 0; i < data.length; i++){
+			var entry = data[i];
+			// Null and undefined types have been converted to string form on 
+			// selection. Convert back to types for comparison against the 
+			// deviceList
+			// TODO: Due to changes in customQueryGenerator, should no longer
+			// receive these entries. Consider removing check.
+			if (data[i] === "null"){
+				data[i] = null;
+			}
+			if (data[i] === "undefined") {
+				data[i] = undefined;
+			}
 			indexValues.push(($.inArray(data[i], deviceList) + 1)); 
 		}
 		// Create search string, additions on left and right side are so
@@ -263,9 +278,7 @@ function updateDataTablesSearch(data){
 			itemString += '|' + "^\\s*"+indexValues[i].toString()+"\\s*$"  ;
 		}
 		// Order the list for use in other functions
-		console.log("updateDataTablesSearch, unsorted", indexValues);
 		indexValues.sort(sortByValue);
-		console.log("updateDataTablesSearch, sorted", indexValues);
 		// Store index values
 		propertiesList.deviceFilterNumbers = indexValues;
 		// Search the table and draw the output
@@ -282,15 +295,3 @@ function updateDataTablesSearch(data){
 	}
 }
 
-// Function to sort a list with, smallest to largest
-// Note: this function is necessary as the standard sort function uses
-//		== which means when you have an array of [12, 13, 15, 37, 2]
-//		The result would be [12, 13, 15, 2, 37] in javascript
-function sortByValue(a, b) {
-	if (a === b) {
-		return 0;
-	}
-	else {
-		return (a < b) ? -1 : 1; // largest to smallest
-	}
-}

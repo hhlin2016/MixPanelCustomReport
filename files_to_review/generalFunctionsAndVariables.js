@@ -5,6 +5,8 @@
 		Custom User Input Variables
 		Data Parsing
 		Time Operations
+		Sort Functions
+		Adjust Data for Apple Models
 */
 
 /*
@@ -21,6 +23,7 @@
 			eventGraph
 		initialSettings()
 */
+
 // Limiting variables for graph display
 var graphNumberLimit = 20; // maximum number of items for pie chart (switches 
 							//to bar chart after)
@@ -30,15 +33,16 @@ var graphDisplayUpperLimit = 100; // maximum number for display regardless of
 // Set initial properties required for segmentation
 var propertiesList = {
 	appNameString : null,
-	platformString : null,
+	platformOSString : null,
 	deviceModelString: null,
 	from: moment().subtract(1, 'months').format("YYYY-MM-DD"),
 	to: moment().format("YYYY-MM-DD"),
-	limit : 10
+	limit : 10,
+	adjustForApple: false
 }
 var dropdownVariables = {
-	platform : { title : 'Platform', ID : '.chosen-platform', 
-		stringName : "platformString"},
+	platformOS : { title : 'Platform', ID : '.chosen-platformOS', 
+		stringName : "platformOSString"},
 	appName : { title : 'App Name', ID : '.chosen-appName', 
 		stringName : "appNameString"},
 	model : { title : '$model', ID : '.chosen-model', 
@@ -50,16 +54,19 @@ var lastDataPull;
 // Global variables for referencing
 var deviceList;
 var totalNumUsers;
+var appleDevicesInList = {};
+
+// Initialize menus and graph
 var eventSelect;
 var eventGraph = $('#graph');
 
-function initialSettings(){
+function initializeChosenInterface(){
 				// Initial variables
 	eventSelect = $('#eventSelect').MPEventSelect();
 
 	// Initialize Chosen Interface
 	$('.chosen-model').chosen().val();
-	$('.chosen-platform').chosen().val();
+	$('.chosen-platformOS').chosen().val();
 	$('.chosen-appName').chosen().val();
 }
 
@@ -70,7 +77,7 @@ function initialSettings(){
 		initializeDropdownMenus()
 		updateDropdownMenu(dropdownMenuVariables, data)
 		clearDropdownMenu(dropdownMenuVariables)
-		getDropdownMenuData(dropdownMenuVariables)
+		updateDropdownMenuData(dropdownMenuVariables)
 */
 
 //Dropdown Limit Options
@@ -96,15 +103,92 @@ var dateOptions = {
 	]
 };
 
-// Instantiate dropdown menus
-var dropdownLimit
-var dropdownDates
+// Dropdown Platform or OS Options
+var platformOSOptions = {
+	items: [
+		{label: 'Platform', value: 'Platform'},
+		{label: 'OS', value: 'OS'}
+	]
+};
 
+// Dropdown Adjust for Apple Models or Not
+// A checkbox, switch, etc. could all be used but for uniformity, a dropdown box was selected
+var AppleAdjustmentOptions = {
+	items: [
+		{label: 'No', value: false},
+		{label: 'Yes', value: true}
+	]
+};
+
+// Instantiate dropdown menus
+var dropdownLimit;
+var dropdownDates;
+var dropdownPlatformOS;
+var dropdownAdjustForAppleModels;
+
+// initialize the Chosen dropdown menus
 function initializeDropdownMenus() {
 	// limit Options  
 	dropdownLimit = $('#numResultsSelect').MPSelect(limitOptions); 
 	// date Options
 	dropdownDates = $('#timeSelect').MPSelect(dateOptions);     
+	// Select Platform or OS
+	dropdownPlatformOS = $('#selectPlatformOS').MPSelect(platformOSOptions);     
+	// Select to Adjust for Apple Model Names or not
+	dropdownAdjustForAppleModels = $('#selectAdjustForAppleModels').
+		MPSelect(AppleAdjustmentOptions);     
+}
+
+// Show or hide Adjust for Apple Models depending on selection
+// Input: array of Platform or OS selections
+function displayAdjustForAppleModels(selection) {
+	console.log("displayAdjustForAppleModels called", selection)
+	var checkItems = ['iOS', 'iPhone OS'];
+	var displayAdjustment = -1;
+	for (var i = 0; i < checkItems.length; i++){
+		displayAdjustment = $.inArray(checkItems[i], selection);
+		// Found entry, end loop
+		if (displayAdjustment >= 0) {
+			break;
+		}
+	}
+	// Set menu to default
+	$("#selectAdjustForAppleModels").val(false);
+	propertiesList.adjustForApple = false;
+	// iOS or iPhone OS selected or show all (Apple models may be in list)
+	// show adjustment
+	if (displayAdjustment >= 0 || !selection) {
+		$(".adjustForAppleModels").show();
+	}
+	// selected non-Apple products, hide Adjustment
+	else {
+		$(".adjustForAppleModels").hide();
+	}
+}
+
+
+// Update the Dictionary entry for PlatformOS
+// Input: PlatformOSSelection, String, either Platform or OS
+function updatePlatformOS(PlatformOSSelection) {
+	switch (PlatformOSSelection){
+		case 'Platform':	dropdownVariables['platformOS'] = { title : 
+			'Platform', ID : '.chosen-platformOS', stringName : 
+			"platformOSString"};
+			// adjust the placeholder string for Platform
+			$(".chosen-platformOS").attr("data-placeholder", 
+				"Select Platform(s), leave empty for all");
+			$(".chosen-platformOS").trigger("chosen:updated");
+			break;
+		case 'OS':	dropdownVariables['platformOS'] = { title : '$os', 
+			ID : '.chosen-platformOS', stringName : "platformOSString"};
+			// adjust the placeholder string for OS
+			$(".chosen-platformOS").attr("data-placeholder", 
+				"Select OS(es), leave empty for all");
+			$(".chosen-platformOS").trigger("chosen:updated");
+			break;
+		default:
+			console.log("updatePlatformOS, invalid input option");
+	}
 }
 
 // Function to update the Chosen dropdown menu selections
@@ -142,7 +226,7 @@ function clearDropdownMenu(dropdownMenuVariables){
 	$(dropdownMenuVariables.ID).val('').trigger("chosen:updated");
 	// Clear table and graph search criteria
 	if (dropdownMenuVariables.title === '$model'){
-		updateDataTablesSearch(null);
+		updateDataTablesSearchResults(null);
 	}
 }
 
@@ -150,23 +234,31 @@ function clearDropdownMenu(dropdownMenuVariables){
 // Called in Response to User Clicking On: dropdownDates, datePicker, 
 //		appName dropdown, eventSelect, Platform dropdown
 // Inputs: dropdownVariables dataset for identification parameters
-function getDropdownMenuData(dropdownMenuVariables){
+function updateDropdownMenuData(dropdownMenuVariables){
 	var params = {
 		from_date: propertiesList.from,
 		to_date: propertiesList.to,
 		event: eventSelect.MPEventSelect('value')
 	};
 	var script = buildCustomQueryFunctionScript(dropdownMenuVariables.title, 0);
-	MP.api.custom_query(script, params).done(function(results) {
-		updateDropdownMenu(dropdownMenuVariables, results[0]);
+	// Reset found device list
+	MP.api.jql(script, params).done(function(results) {
+		var data = results[0];
+		// Updating model list but need to adjust for Apple entries first
+		if (dropdownMenuVariables.title === '$model' && propertiesList.adjustForApple){	
+			data = adjustTitlesForApple(data);
+		}
+		updateDropdownMenu(dropdownMenuVariables, data);
 	});		
 }
+
 
 /* 
 	Custom User Input Variables
 		updateTime(period)
 		customNumberDevicesSelect(numDevices) {
 */
+
 // Function to update the selected time from the dropdown menu
 // Also shows/hides elements relating to the jQuery datePicker
 // Called in Response to User Clicking On: dropdownDates
@@ -207,7 +299,7 @@ function customNumberDevicesSelect(numDevices) {
 		propertiesList["limit"] = numDevices;
 		$(".tbxNumSelect").hide();
 		// Use last pulled server data to recompute list
-		plotChart(lastDataPull);
+		createDataTable(lastDataPull);
 	}
 }
 
@@ -216,6 +308,7 @@ function customNumberDevicesSelect(numDevices) {
 		convertArrayToObject(data)
 		parseBaseData(data)
 */
+
 // Function to convert Array data to a JSON object for MPCharts
 // Input: Array of [Device Name, Number of Users] sub-arrays
 function convertArrayToObject(data){
@@ -273,4 +366,131 @@ function updateTime(period) {
 		propertiesList["to"] = to_date;
 		$(".timeSelectGroup").hide();
 	}
+}
+
+/*
+	Sort Functions
+		sortByValue
+		sortByIndex1
+*/
+
+// Function to sort a list with, smallest to largest
+// Note: this function is necessary as the standard sort function uses
+//		== which means when you have an array of [12, 13, 15, 37, 2]
+//		The result would be [12, 13, 15, 2, 37] in javascript
+function sortByValue(a, b) {
+	if (a === b) {
+		return 0;
+	}
+	else {
+		return (a < b) ? -1 : 1; // smallest to largest
+	}
+}
+
+// Function to sort an array's 1st index from largest to smallest
+function sortByIndex1(a, b) {
+	if (a[1] === b[1]) {
+		return 0;
+	}
+	else {
+		return (a[1] < b[1]) ? 1 : -1; // largest to smallest
+	}
+}
+
+/*
+	Adjust Data for Apple Models
+		adjustDataForApple
+		adjustTitlesForApple
+*/
+
+// Group the Apple device data together into their desired names as per
+// the appleDevices list
+// Inputs: data, an Array of [Rank, Device Name, # users, % users] sub-arrays
+// Outputs: data, an Array of [Rank, Device Name, # users, % users] sub-arrays
+// CONSIDER: The data is being pulled in [Rank, Device Name, # Users, % Users] 
+// format. We actually need the data in [Device Name, # Users], consider adding 
+// a new script type that uses a reducer function for this purpose instead. 
+// It would reduce n computations as we loop through the list here to create 
+// a new list which we then add the Rank and % values to
+function adjustDataForApple(data){
+	// Need indexes of devices
+	parseBaseData(data);
+	var newData = [];
+	var locationData = [];
+	var newResults = [];
+	var appleKeys = Object.keys(appleDevicesInList);
+	for (var i = 0; i < appleKeys.length; i++){
+		var appleDeviceSum = 0;
+		var foundAppleDevices = appleDevicesInList[appleKeys[i]];
+		for (var j = 0; j < foundAppleDevices.length; j++){
+			var device = foundAppleDevices[j];
+			var locationDeviceInList = $.inArray(device, deviceList);
+			// Make sure the location exists before summing
+			if (locationDeviceInList >= 0){
+				locationData.push(locationDeviceInList);
+				appleDeviceSum+= data[locationDeviceInList][2];
+			}
+		}
+		var newEntry = [appleKeys[i], appleDeviceSum];
+		newData.push(newEntry);
+	}
+	var testSum = 0;
+	var testSumApple = 0;
+	for (var i = 0; i < data.length; i++){
+		var entry = data[i];
+		// -1 to account for ranking starting at 1 instead of 0
+		var checkIfAlreadyCounted = $.inArray(parseInt(entry[0]-1), locationData);
+		// Not an Apple device therefore add it
+		if (checkIfAlreadyCounted === -1) {
+			testSum += parseInt(entry[2]);
+			newData.push([entry[1], entry[2]]);
+		}
+		else{
+			testSumApple += parseInt(entry[2]);
+		}
+	}
+	newData.sort(sortByIndex1);				
+	// Re-parse data to [Rank, Device Name, # Users, % Users]
+	for (var i = 0; i < newData.length; i++) {
+		var element = newData[i];
+		var newElement = [i+1, element[0], element[1], parseFloat(element[1]
+			/ total * 100).toFixed(2)];
+		newData[i] = newElement;
+	}
+
+	return newData;
+}
+
+// Group the Apple device data together into their desired names as per
+// the appleDevices list, used for setting of model dropdown menu
+// Inputs: data, a list of device names
+// Outputs: data, a list of device names
+function adjustTitlesForApple(data){	
+	// Clear list of found apple items
+	appleDevicesInList = {};
+	// get cumulative device list and total number of users
+	// Check against each of the Apple Devices to see if their entries exist in the 
+	var appleKeys = Object.keys(appleDevices);
+	for (var i = 0; i < appleKeys.length; i++){
+		var appleElement = appleDevices[appleKeys[i]];
+		var foundAppleDevicesForThisKey = [];
+		for (var j = 0; j < appleElement.length; j++){
+			// Check if Apple Device is in the device list. If so, add it to appleDevicesInList (so that list can be used for the actual data pull instead of redoing this loop) and update the list accordingly
+			var indexOfAppleDevice = $.inArray(appleElement[j], data);
+			if (indexOfAppleDevice >= 0){
+				// Check if the Apple Device Name already exists in the list. If not, add it
+				if ($.inArray(appleKeys[i], data) === -1){
+					data.push(appleKeys[i]);
+				}
+				// Remove original Apple Device name from list
+				data.splice(indexOfAppleDevice, 1);
+				foundAppleDevicesForThisKey.push(appleElement[j]);
+			}
+		}
+		// Add original Apple Device to list of Apple devices
+		if (foundAppleDevicesForThisKey.length > 0){
+			appleDevicesInList[appleKeys[i]] = foundAppleDevicesForThisKey;
+		}
+	}
+	return data;
 }

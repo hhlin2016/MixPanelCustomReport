@@ -17,6 +17,14 @@ function updateFilterString(dropdownMenu){
 		for (var i = 0; i < itemList.length; i++){
 			var newEntry = stringCheckForItem(itemList[i],
 			leftSideEquivalencyTest);
+			// In the MixPanel data, undefined variables do not count as
+			// 'null' entries but they return with the same reply when
+			// pulling labels therefore requiring an added check to compensate
+			if (itemList[i] === "null"){
+				var newEntry2 = stringCheckForItem("undefined",
+			leftSideEquivalencyTest);
+				selectedItemStrings.push(newEntry2);
+			}
 			selectedItemStrings.push(newEntry);
 		}		
 		outputString += selectedItemStrings.join(' || ');
@@ -43,7 +51,7 @@ function stringCheckForItem(selectedItem, leftSideEquivalencyTest){
 	// length 1 come into play
 	// NOTE: isNaN function doesn't work when checking numbers in a string 
 	// so checking by length
-	if (isNaN(selectedItem) && selectedItem !== "undefined"){
+	if (isNaN(selectedItem) && selectedItem !== "undefined" && selectedItem !== "null"){
 		outputString = leftSideEquivalencyTest + '"' + selectedItem + '"';
 	}
 	// A numerical input or undefined value, do not add quotations
@@ -68,10 +76,16 @@ function buildCustomQueryFunctionScript(propertySelector, selector){
 				event_selectors: [{event: params.event}]})';
 	// filter by event
 	var eventFilter = '.filter(function(event) { return (event.name === params.event ) })';
+	// Remove null and undefined entries in Platform
+	var generalPlatformOSFilter = '.filter(function(event) { return (event.properties.' + 
+		dropdownVariables.platformOS.title + ')})';
+	// Remove historical entries using 0..3 notation.
+	var numbersPlatformOSFilter = '.filter(function(event) { return (isNaN(event.properties.' + 
+		dropdownVariables.platformOS.title + '))})';
 	// filter by properties (Platform, App Name, and $model)
 	var propertyFilters = '';
-	if (propertiesList.platformString){
-		propertyFilters += '.filter(function(event) { return (' + propertiesList.platformString +' ) })';
+	if (propertiesList.platformOSString){
+		propertyFilters += '.filter(function(event) { return (' + propertiesList.platformOSString +' ) })';
 	}
 	if (propertiesList.appNameString){
 		propertyFilters += '.filter(function(event) { return (' + propertiesList.appNameString +' ) })';
@@ -100,13 +114,8 @@ function buildCustomQueryFunctionScript(propertySelector, selector){
 					}\
 					for (i=0; i<object.length; i++){\
 						var element = object[i].key["0"];\
-						if (element){\
-						  allData.push(element);\
+						allData.push(element);\
 						}\
-						else{\
-						  allData.push("undefined");\
-						}\
-					}\
 					return allData;\
 				})'
 			break;
@@ -151,9 +160,6 @@ function buildCustomQueryFunctionScript(propertySelector, selector){
 					}\
 					for (i = 0; i < event.length; i++){\
 						var name = event[i][0];\
-						if (name === null){\
-							name = "undefined";\
-						}\
 						var element = [i+1, name, event[i][1], parseFloat(event[i][1] \
 						/ total * 100).toFixed(2)];\
 						allData.push(element);\
@@ -165,6 +171,7 @@ function buildCustomQueryFunctionScript(propertySelector, selector){
 			console.log("buildCustomQueryFunctionScript, incorrect selector value");
 	}
 	// Build the whole script and return
-	outputString = startFunction + eventFilter + propertyFilters + groupByString + reducer + map + '}';
+	outputString = startFunction + generalPlatformOSFilter + numbersPlatformOSFilter 
+		+ eventFilter + propertyFilters + groupByString + reducer + map + '}';
 	return outputString;
 }
